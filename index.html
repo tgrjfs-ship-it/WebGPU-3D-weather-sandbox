@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "highlightjs": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/es/highlight.min.js",
+                "marked": "https://esm.sh/marked@12.0.2"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="header-left">
+                <h1>Chat</h1>
+            </div>
+            <div class="header-controls">
+                <button id="feedbackBtn" class="header-btn" title="Send Feedback">⭐ Feedback</button>
+                <button id="aipediaBtn" class="header-btn" title="AIpedia">📚 AIpedia</button>
+                <button id="plansBtn" class="header-btn" title="Plans">💳 Plans</button>
+                <button id="selectToggleBtn" class="header-btn" title="Select messages">✅ Select</button>
+                <button id="searchToggleBtn" class="header-btn" title="Search messages">🔍 Search</button>
+                <button id="plusBtn" class="header-btn" title="Options">➕ More</button>
+                <button id="settingsBtn" class="header-btn" title="Settings">⚙️ Settings</button>
+                <button id="themeBtn" class="header-btn" title="Toggle theme">🌙 Theme</button>
+                <button id="fullscreenBtn" class="header-btn" title="Toggle fullscreen">⛶ Full</button>
+                <button id="interruptBtn" class="header-btn" title="Interrupt generation">⏹ Stop</button>
+                <button id="updateLogBtn" class="header-btn" title="Update log">🛈 Updates</button>
+            </div>
+        </div>
+
+        <div class="action-menu" id="actionMenu">
+            <div class="menu-content">
+                <button class="menu-item" title="Attach file" id="attachFileBtn">📎 Attach File</button>
+                <button class="menu-item" title="Generate Image" id="imageGenBtn">🖼️ Generate Image</button>
+                <button class="menu-item" title="Think deeper" id="thinkDeeperBtn">🧠 Think Deeper</button>
+                <button class="menu-item" title="Canvas" id="canvasBtn">🎨 Canvas</button>
+                <button class="menu-item" title="Voice Input" id="voiceInputBtn">🎤 Voice Input</button>
+                <button class="menu-item" title="Templates" id="templatesBtn">📋 Templates</button>
+                <button class="menu-item" title="Bookmarks" id="bookmarksBtn">⭐ Bookmarks</button>
+                <button class="menu-item" title="Branches/History" id="branchesBtn">🌿 History/Branches</button>
+                <button class="menu-item close" id="closeMenuBtn">Close</button>
+            </div>
+        </div>
+
+        <div class="settings-panel" id="settingsPanel">
+            <div class="settings-content">
+                <h2>Settings</h2>
+                <div class="setting-group">
+                    <label>Model</label>
+                    <!-- Custom model picker (replaces native select) -->
+                    <div id="modelPicker" class="model-picker" role="listbox" aria-label="Model picker" tabindex="0">
+                        <button id="modelPickerToggle" class="model-picker-toggle">Model: <span id="modelPickerLabel">GPT-4o</span> ▾</button>
+                        <div id="modelPickerMenu" class="model-picker-menu" role="menu" aria-hidden="true"></div>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label for="bgColorInput">Background Color</label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="color" id="bgColorInput" aria-label="Pick background color" style="flex:0 0 auto;width:44px;height:32px;padding:0;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-primary);">
+                        <button id="bgColorResetBtn" class="settings-action-btn secondary" style="flex:1;">Reset</button>
+                    </div>
+                </div>
+                <div class="setting-group" id="modelStats" aria-live="polite" title="Model statistics">
+                    <label>Model Stats</label>
+                    <div class="model-stats">
+                        <div class="stat"><strong>Intelligence:</strong> <span id="stat-intelligence">—</span></div>
+                        <div class="stat"><strong>Think Time:</strong> <span id="stat-think">—</span></div>
+                        <div class="stat"><strong>Typing Speed:</strong> <span id="stat-typing">—</span></div>
+                        <div class="stat"><strong>Typing Jitter:</strong> <span id="stat-jitter">—</span></div>
+                        <div class="stat"><strong>Description:</strong> <span id="stat-desc" class="desc">—</span></div>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label for="highlightToggle">Syntax Highlighting</label>
+                    <select id="highlightToggle">
+                        <option value="on">On</option>
+                        <option value="off">Off</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="fontSelect">Font</label>
+                    <select id="fontSelect" aria-label="Choose UI font">
+                        <option value="noto-sans">Noto Sans (default)</option>
+                        <option value="cal-sans">Cal Sans</option>
+                        <option value="space-mono">Space Mono</option>
+                        <option value="system">System UI</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="systemLanguageSelect">System Language</label>
+                    <select id="systemLanguageSelect" aria-label="Choose system language">
+                        <option value="en" selected>English (en)</option>
+                        <option value="es">Español (es)</option>
+                        <option value="fr">Français (fr)</option>
+                        <option value="de">Deutsch (de)</option>
+                        <option value="it">Italiano (it)</option>
+                        <option value="pt">Português (pt)</option>
+                        <option value="ru">Русский (ru)</option>
+                        <option value="hi">हिन्दी (hi)</option>
+                        <option value="ja">日本語 (ja)</option>
+                        <option value="zh">中文 (zh)</option>
+                        <option value="tl">Filipino (tl)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Tone</label>
+                    <select id="toneSelect">
+                        <option value="neutral" selected>Neutral</option>
+                        <option value="formal">Formal</option>
+                        <option value="casual">Casual</option>
+                        <option value="humorous">Humorous</option>
+                        <option value="professional">Professional</option>
+                        <option value="creative">Creative</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="systemPromptInput">Custom System Prompt (Personality)</label>
+                    <textarea id="systemPromptInput" placeholder="E.g., You are a witty British robot assistant. Keep responses brief." rows="3"></textarea>
+                </div>
+                <label for="executionToggle">Code Auto-Execution</label>
+                <input type="checkbox" id="executionToggle" style="width: auto;">
+                <div class="setting-group">
+                    <label>Creativity: <span id="tempValue">0.7</span></label>
+                    <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7">
+                </div>
+                <div class="setting-group">
+                    <label>Preferred Code Language</label>
+                    <select id="codeLangSelect">
+                        <option value="javascript" selected>JavaScript</option>
+                        <option value="html">HTML</option>
+                        <option value="tailwind">Tailwind CSS</option>
+                        <option value="python">Python</option>
+                        <option value="java">Java</option>
+                    </select>
+                </div>
+                <button id="clearChatBtn" class="settings-action-btn danger">Clear Chat</button>
+                <button id="exportChatBtn" class="settings-action-btn">Export Chat</button>
+                <button id="closeSettingsBtn" class="settings-action-btn secondary">Close</button>
+            </div>
+        </div>
+
+        <div class="preview-panel" id="previewPanel">
+            <div class="preview-header">
+                <h3>Preview</h3>
+                <button id="closePreviewBtn" class="close-preview-btn">✕</button>
+            </div>
+            <div class="preview-content" id="previewContent"></div>
+            <div class="preview-console" id="previewConsole">
+                <div class="console-header">
+                    <span>Console</span>
+                    <button id="clearPreviewConsole" class="toolbar-btn" style="margin-left:auto;">Clear</button>
+                </div>
+                <div class="console-body" id="previewConsoleBody" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div class="search-bar" id="searchBar">
+            <input type="text" id="searchInput" placeholder="Search messages...">
+            <button id="closeSearchBtn">✕</button>
+        </div>
+        
+        <div class="messages-container" id="messagesContainer">
+            <div class="message assistant">
+                <div class="message-content">Hello! How can I help you today?</div>
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <div id="statusIndicator" class="status-indicator"></div>
+            <form id="chatForm">
+                <textarea 
+                    id="messageInput" 
+                    placeholder="Type your message..." 
+                    rows="1"
+                ></textarea>
+                <button type="submit" id="sendButton">Send</button>
+            </form>
+        </div>
+
+        <!-- Hidden file input for Attach File feature -->
+        <input type="file" id="fileInput" style="display:none;" />
+
+        <!-- Edit Code Modal -->
+        <div id="editCodeModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Code Block</h3>
+                <button id="closeEditModalBtn" class="close-preview-btn" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-toolbar">
+                <span class="toolbar-item">Language: <strong id="editLangLabel">auto</strong></span>
+                <span class="toolbar-spacer"></span>
+                <button id="formatCodeBtn" class="toolbar-btn">Format</button>
+                <button id="runCodeBtn" class="toolbar-btn">Run</button>
+            </div>
+            <textarea id="editCodeTextarea" class="edit-code-textarea" spellcheck="false" aria-label="Code editor"></textarea>
+            <div class="modal-actions">
+                <button id="saveCodeEditBtn" class="settings-action-btn">Save</button>
+                <button id="cancelCodeEditBtn" class="settings-action-btn secondary">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Update Log Modal -->
+        <div id="updateLogModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
+            <div class="modal-header">
+                <h3 class="modal-title">Update Log</h3>
+                <button id="closeUpdateLogBtn" class="close-preview-btn" aria-label="Close">✕</button>
+            </div>
+            <div style="padding:12px 16px;">
+                <pre id="updateLogContent" style="white-space:pre-wrap;font-family:inherit;font-size:13px;color:var(--text-primary);">- 2025-10-26: Added Claude/Gemini/GPT models, fullscreen, edits, and more.
+- 2025-10-26: Added Update Log and Interrupt capability for AI generation (you can stop thinking mid-response).
+                </pre>
+            </div>
+        </div>
+
+        <!-- AIpedia Modal -->
+        <div id="aipediaModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
+            <div class="modal-header">
+                <h3 class="modal-title">AIpedia — Model Reference</h3>
+                <button id="closeAipediaBtn" class="close-preview-btn" aria-label="Close">✕</button>
+            </div>
+            <div style="padding:12px 16px;">
+                <input id="aipediaSearch" placeholder="Search models or topics..." style="width:100%;padding:8px;border:1px solid var(--border-color);border-radius:6px;margin-bottom:12px;">
+                <div id="aipediaContent" style="max-height:52vh;overflow:auto;"></div>
+            </div>
+            <div style="padding:12px 16px;border-top:1px solid var(--border-color);display:flex;gap:8px;justify-content:flex-end;">
+                <button id="aipediaCloseBtn" class="settings-action-btn secondary">Close</button>
+            </div>
+        </div>
+
+        <!-- Bottom actions shown after assistant finishes -->
+        <div id="bottomActions" class="bottom-actions" aria-hidden="true" style="display:none;">
+            <button id="combinedPreviewBtn" class="response-action-btn hidden" title="Run all code">▶️ Run Code</button>
+            <button class="response-action-btn" title="Good response">👍</button>
+            <button class="response-action-btn" title="Regenerate">🔄</button>
+            <button class="response-action-btn" title="Copy">📋</button>
+        </div>
+
+        <!-- Plans / Subscription Modal -->
+        <div id="plansModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
+            <div class="modal-header">
+                <h3 class="modal-title">Plans & Subscription</h3>
+                <button id="closePlansBtn" class="close-preview-btn" aria-label="Close">✕</button>
+            </div>
+            <div style="padding:12px 16px;">
+                <div id="plansContent"></div>
+            </div>
+            <div style="padding:12px 16px;border-top:1px solid var(--border-color);display:flex;gap:8px;justify-content:flex-end;">
+                <button id="plansCancelBtn" class="settings-action-btn secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
