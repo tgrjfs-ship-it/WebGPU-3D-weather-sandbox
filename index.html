@@ -3,261 +3,1266 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatbot X5</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
-    <link rel="stylesheet" href="styles.css">
-    <script type="importmap">
-        {
-            "imports": {
-                "highlightjs": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/es/highlight.min.js",
-                "marked": "https://esm.sh/marked@12.0.2"
-            }
+    <title>Advanced Storm Simulation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; font-family: 'Courier New', monospace; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .ui-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-    </script>
+        #stats { top: 16px; left: 16px; }
+        #controls { bottom: 16px; left: 16px; font-size: 12px; }
+        #info { bottom: 16px; right: 16px; font-size: 12px; }
+        #toggle-gui {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+        #toggle-gui:hover { background: rgba(0, 0, 0, 0.9); }
+        .stat-value { color: #6cf; font-weight: bold; }
+        .hidden { display: none; }
+        .title { color: #6cf; font-weight: bold; margin-bottom: 12px; }
+    </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <div class="header-left">
-                <h1>Chat</h1>
-            </div>
-            <div class="header-controls">
-                <button id="feedbackBtn" class="header-btn" title="Send Feedback">⭐ Feedback</button>
-                <button id="aipediaBtn" class="header-btn" title="AIpedia">📚 AIpedia</button>
-                <button id="plansBtn" class="header-btn" title="Plans">💳 Plans</button>
-                <button id="selectToggleBtn" class="header-btn" title="Select messages">✅ Select</button>
-                <button id="searchToggleBtn" class="header-btn" title="Search messages">🔍 Search</button>
-                <button id="plusBtn" class="header-btn" title="Options">➕ More</button>
-                <button id="settingsBtn" class="header-btn" title="Settings">⚙️ Settings</button>
-                <button id="themeBtn" class="header-btn" title="Toggle theme">🌙 Theme</button>
-                <button id="fullscreenBtn" class="header-btn" title="Toggle fullscreen">⛶ Full</button>
-                <button id="interruptBtn" class="header-btn" title="Interrupt generation">⏹ Stop</button>
-                <button id="updateLogBtn" class="header-btn" title="Update log">🛈 Updates</button>
-            </div>
-        </div>
-
-        <div class="action-menu" id="actionMenu">
-            <div class="menu-content">
-                <button class="menu-item" title="Attach file" id="attachFileBtn">📎 Attach File</button>
-                <button class="menu-item" title="Generate Image" id="imageGenBtn">🖼️ Generate Image</button>
-                <button class="menu-item" title="Think deeper" id="thinkDeeperBtn">🧠 Think Deeper</button>
-                <button class="menu-item" title="Canvas" id="canvasBtn">🎨 Canvas</button>
-                <button class="menu-item" title="Voice Input" id="voiceInputBtn">🎤 Voice Input</button>
-                <button class="menu-item" title="Templates" id="templatesBtn">📋 Templates</button>
-                <button class="menu-item" title="Bookmarks" id="bookmarksBtn">⭐ Bookmarks</button>
-                <button class="menu-item" title="Branches/History" id="branchesBtn">🌿 History/Branches</button>
-                <button class="menu-item close" id="closeMenuBtn">Close</button>
-            </div>
-        </div>
-
-        <div class="settings-panel" id="settingsPanel">
-            <div class="settings-content">
-                <h2>Settings</h2>
-                <div class="setting-group">
-                    <label>Model</label>
-                    <!-- Custom model picker (replaces native select) -->
-                    <div id="modelPicker" class="model-picker" role="listbox" aria-label="Model picker" tabindex="0">
-                        <button id="modelPickerToggle" class="model-picker-toggle">Model: <span id="modelPickerLabel">GPT-4o</span> ▾</button>
-                        <div id="modelPickerMenu" class="model-picker-menu" role="menu" aria-hidden="true"></div>
-                    </div>
-                </div>
-                <div class="setting-group">
-                    <label for="bgColorInput">Background Color</label>
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <input type="color" id="bgColorInput" aria-label="Pick background color" style="flex:0 0 auto;width:44px;height:32px;padding:0;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-primary);">
-                        <button id="bgColorResetBtn" class="settings-action-btn secondary" style="flex:1;">Reset</button>
-                    </div>
-                </div>
-                <div class="setting-group" id="modelStats" aria-live="polite" title="Model statistics">
-                    <label>Model Stats</label>
-                    <div class="model-stats">
-                        <div class="stat"><strong>Intelligence:</strong> <span id="stat-intelligence">—</span></div>
-                        <div class="stat"><strong>Think Time:</strong> <span id="stat-think">—</span></div>
-                        <div class="stat"><strong>Typing Speed:</strong> <span id="stat-typing">—</span></div>
-                        <div class="stat"><strong>Typing Jitter:</strong> <span id="stat-jitter">—</span></div>
-                        <div class="stat"><strong>Description:</strong> <span id="stat-desc" class="desc">—</span></div>
-                    </div>
-                </div>
-                <div class="setting-group">
-                    <label for="highlightToggle">Syntax Highlighting</label>
-                    <select id="highlightToggle">
-                        <option value="on">On</option>
-                        <option value="off">Off</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label for="fontSelect">Font</label>
-                    <select id="fontSelect" aria-label="Choose UI font">
-                        <option value="noto-sans">Noto Sans (default)</option>
-                        <option value="cal-sans">Cal Sans</option>
-                        <option value="space-mono">Space Mono</option>
-                        <option value="system">System UI</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label for="systemLanguageSelect">System Language</label>
-                    <select id="systemLanguageSelect" aria-label="Choose system language">
-                        <option value="en" selected>English (en)</option>
-                        <option value="es">Español (es)</option>
-                        <option value="fr">Français (fr)</option>
-                        <option value="de">Deutsch (de)</option>
-                        <option value="it">Italiano (it)</option>
-                        <option value="pt">Português (pt)</option>
-                        <option value="ru">Русский (ru)</option>
-                        <option value="hi">हिन्दी (hi)</option>
-                        <option value="ja">日本語 (ja)</option>
-                        <option value="zh">中文 (zh)</option>
-                        <option value="tl">Filipino (tl)</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label>Tone</label>
-                    <select id="toneSelect">
-                        <option value="neutral" selected>Neutral</option>
-                        <option value="formal">Formal</option>
-                        <option value="casual">Casual</option>
-                        <option value="humorous">Humorous</option>
-                        <option value="professional">Professional</option>
-                        <option value="creative">Creative</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label for="systemPromptInput">Custom System Prompt (Personality)</label>
-                    <textarea id="systemPromptInput" placeholder="E.g., You are a witty British robot assistant. Keep responses brief." rows="3"></textarea>
-                </div>
-                <label for="executionToggle">Code Auto-Execution</label>
-                <input type="checkbox" id="executionToggle" style="width: auto;">
-                <div class="setting-group">
-                    <label>Creativity: <span id="tempValue">0.7</span></label>
-                    <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7">
-                </div>
-                <div class="setting-group">
-                    <label>Preferred Code Language</label>
-                    <select id="codeLangSelect">
-                        <option value="javascript" selected>JavaScript</option>
-                        <option value="html">HTML</option>
-                        <option value="tailwind">Tailwind CSS</option>
-                        <option value="python">Python</option>
-                        <option value="java">Java</option>
-                    </select>
-                </div>
-                <button id="clearChatBtn" class="settings-action-btn danger">Clear Chat</button>
-                <button id="exportChatBtn" class="settings-action-btn">Export Chat</button>
-                <button id="closeSettingsBtn" class="settings-action-btn secondary">Close</button>
-            </div>
-        </div>
-
-        <div class="preview-panel" id="previewPanel">
-            <div class="preview-header">
-                <h3>Preview</h3>
-                <button id="closePreviewBtn" class="close-preview-btn">✕</button>
-            </div>
-            <div class="preview-content" id="previewContent"></div>
-            <div class="preview-console" id="previewConsole">
-                <div class="console-header">
-                    <span>Console</span>
-                    <button id="clearPreviewConsole" class="toolbar-btn" style="margin-left:auto;">Clear</button>
-                </div>
-                <div class="console-body" id="previewConsoleBody" aria-live="polite"></div>
-            </div>
-        </div>
-
-        <div class="search-bar" id="searchBar">
-            <input type="text" id="searchInput" placeholder="Search messages...">
-            <button id="closeSearchBtn">✕</button>
-        </div>
-        
-        <div class="messages-container" id="messagesContainer">
-            <div class="message assistant">
-                <div class="message-content">Hello! How can I help you today?</div>
-            </div>
-        </div>
-        
-        <div class="input-container">
-            <div id="statusIndicator" class="status-indicator"></div>
-            <form id="chatForm">
-                <textarea 
-                    id="messageInput" 
-                    placeholder="Type your message..." 
-                    rows="1"
-                ></textarea>
-                <button type="submit" id="sendButton">Send</button>
-            </form>
-        </div>
-
-        <!-- Hidden file input for Attach File feature -->
-        <input type="file" id="fileInput" style="display:none;" />
-
-        <!-- Edit Code Modal -->
-        <div id="editCodeModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
-            <div class="modal-header">
-                <h3 class="modal-title">Edit Code Block</h3>
-                <button id="closeEditModalBtn" class="close-preview-btn" aria-label="Close">✕</button>
-            </div>
-            <div class="modal-toolbar">
-                <span class="toolbar-item">Language: <strong id="editLangLabel">auto</strong></span>
-                <span class="toolbar-spacer"></span>
-                <button id="formatCodeBtn" class="toolbar-btn">Format</button>
-                <button id="runCodeBtn" class="toolbar-btn">Run</button>
-            </div>
-            <textarea id="editCodeTextarea" class="edit-code-textarea" spellcheck="false" aria-label="Code editor"></textarea>
-            <div class="modal-actions">
-                <button id="saveCodeEditBtn" class="settings-action-btn">Save</button>
-                <button id="cancelCodeEditBtn" class="settings-action-btn secondary">Cancel</button>
-            </div>
-        </div>
-
-        <!-- Update Log Modal -->
-        <div id="updateLogModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
-            <div class="modal-header">
-                <h3 class="modal-title">Update Log</h3>
-                <button id="closeUpdateLogBtn" class="close-preview-btn" aria-label="Close">✕</button>
-            </div>
-            <div style="padding:12px 16px;">
-                <pre id="updateLogContent" style="white-space:pre-wrap;font-family:inherit;font-size:13px;color:var(--text-primary);">- 2025-10-26: Added Claude/Gemini/GPT models, fullscreen, edits, and more.
-- 2025-10-26: Added Update Log and Interrupt capability for AI generation (you can stop thinking mid-response).
-                </pre>
-            </div>
-        </div>
-
-        <!-- AIpedia Modal -->
-        <div id="aipediaModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
-            <div class="modal-header">
-                <h3 class="modal-title">AIpedia — Model Reference</h3>
-                <button id="closeAipediaBtn" class="close-preview-btn" aria-label="Close">✕</button>
-            </div>
-            <div style="padding:12px 16px;">
-                <input id="aipediaSearch" placeholder="Search models or topics..." style="width:100%;padding:8px;border:1px solid var(--border-color);border-radius:6px;margin-bottom:12px;">
-                <div id="aipediaContent" style="max-height:52vh;overflow:auto;"></div>
-            </div>
-            <div style="padding:12px 16px;border-top:1px solid var(--border-color);display:flex;gap:8px;justify-content:flex-end;">
-                <button id="aipediaCloseBtn" class="settings-action-btn secondary">Close</button>
-            </div>
-        </div>
-
-        <!-- Bottom actions shown after assistant finishes -->
-        <div id="bottomActions" class="bottom-actions" aria-hidden="true" style="display:none;">
-            <button id="combinedPreviewBtn" class="response-action-btn hidden" title="Run all code">▶️ Run Code</button>
-            <button class="response-action-btn" title="Good response">👍</button>
-            <button class="response-action-btn" title="Regenerate">🔄</button>
-            <button class="response-action-btn" title="Copy">📋</button>
-        </div>
-
-        <!-- Plans / Subscription Modal -->
-        <div id="plansModal" class="bookmarks-modal" aria-hidden="true" style="display:none;">
-            <div class="modal-header">
-                <h3 class="modal-title">Plans & Subscription</h3>
-                <button id="closePlansBtn" class="close-preview-btn" aria-label="Close">✕</button>
-            </div>
-            <div style="padding:12px 16px;">
-                <div id="plansContent"></div>
-            </div>
-            <div style="padding:12px 16px;border-top:1px solid var(--border-color);display:flex;gap:8px;justify-content:flex-end;">
-                <button id="plansCancelBtn" class="settings-action-btn secondary">Close</button>
-            </div>
+    <div id="canvas-container"></div>
+    <div id="stats" class="ui-panel">
+        <div class="title">⚡ Storm Dynamics</div>
+        <div>FPS: <span class="stat-value" id="fps">0</span></div>
+        <div>Raindrops: <span class="stat-value" id="particles">0</span></div>
+        <div>Clouds: <span class="stat-value" id="clouds">0</span></div>
+        <div>Charge: <span class="stat-value" id="charge">0</span>%</div>
+        <div>Strikes: <span class="stat-value" id="strikes">0</span></div>
+        <div>Wind: <span class="stat-value" id="wind">0</span> m/s</div>
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 11px; color: #888;">
+            <div>• Clouds form over water</div>
+            <div>• Evaporation & condensation</div>
+            <div>• Wind-driven cloud movement</div>
+            <div>• Dynamic precipitation</div>
+            <div>• Branching lightning</div>
         </div>
     </div>
+    <div id="controls" class="ui-panel">
+        <div style="color: #ccc; margin-bottom: 8px; font-weight: bold;">Controls</div>
+        <div style="color: #aaa; font-size: 11px;">
+            <div>🖱️ <strong>Mouse Drag</strong> - Rotate camera</div>
+            <div>🖲️ <strong>Mouse Wheel</strong> - Zoom in/out</div>
+            <div>👆 <strong>Touch Drag</strong> - Rotate camera</div>
+            <div>🤏 <strong>Pinch</strong> - Zoom in/out</div>
+            <div>⌨️ <strong>H Key</strong> - Hide/Show GUI</div>
+        </div>
+    </div>
+    <div id="info" class="ui-panel">
+        <div style="color: #6cf; font-weight: bold;">Storm Simulator v5.0</div>
+        <div style="color: #888;">Physically Based Weather</div>
+    </div>
+    <button id="toggle-gui">👁️ Hide GUI</button>
 
-    <script type="module" src="main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Global state
+        const AppState = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            showGui: true,
+            windField: null,
+            cloudSystem: null,
+            rainSystem: null,
+            lightningSystem: null,
+            evaporationSystem: null,
+            waterBodies: [],
+            cameraControls: {
+                isDrag: false,
+                prevMouse: { x: 0, y: 0 },
+                rotation: { theta: 0, phi: Math.PI / 5.5 },
+                distance: 70,
+                shake: { x: 0, y: 0, z: 0, intensity: 0 }
+            }
+        };
+
+        function createTerrain() {
+            const geo = new THREE.PlaneGeometry(400, 400, 100, 100);
+            const pos = geo.attributes.position.array;
+            const col = new Float32Array(pos.length);
+
+            AppState.waterBodies = [
+                { x: 0, y: 0, r: 50, d: -2 },
+                { x: -80, y: 60, r: 35, d: -1.5 },
+                { x: 100, y: -70, r: 40, d: -1.8 }
+            ];
+
+            for (let i = 0; i < pos.length; i += 3) {
+                const x = pos[i];
+                const y = pos[i + 1];
+                let z = Math.sin(x * 0.02) * Math.cos(y * 0.03) * 2;
+                let isWater = false;
+
+                for (const w of AppState.waterBodies) {
+                    const dist = Math.sqrt((x - w.x) ** 2 + (y - w.y) ** 2);
+                    if (dist < w.r) {
+                        z += w.d * (1 - dist / w.r);
+                        isWater = true;
+                        break;
+                    }
+                }
+
+                pos[i + 2] = z;
+                col[i] = isWater ? 0.2 : 0.4;
+                col[i + 1] = isWater ? 0.4 : 0.6;
+                col[i + 2] = isWater ? 0.7 : 0.3;
+            }
+
+            geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+            geo.computeVertexNormals();
+
+            const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                roughness: 0.8,
+                metalness: 0.2
+            }));
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            AppState.scene.add(ground);
+        }
+
+        class EvaporationSystem {
+            constructor() {
+                this.particles = [];
+                this.maxParticles = 500;
+                this.geometry = new THREE.BufferGeometry();
+                this.positions = new Float32Array(this.maxParticles * 3);
+                this.sizes = new Float32Array(this.maxParticles);
+                this.opacities = new Float32Array(this.maxParticles);
+                
+                for (let i = 0; i < this.maxParticles; i++) {
+                    this.particles.push({ active: false, life: 0 });
+                    this.positions[i * 3] = 0;
+                    this.positions[i * 3 + 1] = -100;
+                    this.positions[i * 3 + 2] = 0;
+                    this.sizes[i] = 0;
+                    this.opacities[i] = 0;
+                }
+                
+                this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+                this.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
+                this.geometry.setAttribute('alpha', new THREE.BufferAttribute(this.opacities, 1));
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                
+                // Multi-layer gradient for wispy vapor
+                const grad1 = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+                grad1.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                grad1.addColorStop(0.3, 'rgba(240, 248, 255, 0.5)');
+                grad1.addColorStop(0.7, 'rgba(220, 235, 250, 0.2)');
+                grad1.addColorStop(1, 'rgba(200, 220, 240, 0)');
+                ctx.fillStyle = grad1;
+                ctx.fillRect(0, 0, 64, 64);
+                
+                const material = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 2.5,
+                    transparent: true,
+                    opacity: 0.5,
+                    map: new THREE.CanvasTexture(canvas),
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    sizeAttenuation: true
+                });
+                
+                this.points = new THREE.Points(this.geometry, material);
+                AppState.scene.add(this.points);
+            }
+
+            spawnEvaporation(x, z) {
+                for (let i = 0; i < this.maxParticles; i++) {
+                    if (!this.particles[i].active) {
+                        const idx = i * 3;
+                        this.positions[idx] = x + (Math.random() - 0.5) * 10;
+                        this.positions[idx + 1] = 0.3;
+                        this.positions[idx + 2] = z + (Math.random() - 0.5) * 10;
+                        
+                        this.particles[i] = {
+                            active: true,
+                            life: 1.0,
+                            vx: (Math.random() - 0.5) * 0.03,
+                            vy: 0.06 + Math.random() * 0.08,
+                            vz: (Math.random() - 0.5) * 0.03,
+                            maxHeight: 6 + Math.random() * 10,
+                            size: 0.8 + Math.random() * 1.2
+                        };
+                        this.sizes[i] = this.particles[i].size;
+                        this.opacities[i] = 0.5;
+                        break;
+                    }
+                }
+            }
+
+            update() {
+                // More frequent evaporation
+                if (Math.random() < 0.5) {
+                    const water = AppState.waterBodies[Math.floor(Math.random() * AppState.waterBodies.length)];
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * water.r * 0.95;
+                    this.spawnEvaporation(
+                        water.x + Math.cos(angle) * radius,
+                        water.y + Math.sin(angle) * radius
+                    );
+                }
+
+                for (let i = 0; i < this.maxParticles; i++) {
+                    if (!this.particles[i].active) continue;
+                    
+                    const p = this.particles[i];
+                    const idx = i * 3;
+                    
+                    // Expand and rise
+                    this.positions[idx] += p.vx;
+                    this.positions[idx + 1] += p.vy;
+                    this.positions[idx + 2] += p.vz;
+                    
+                    p.life -= 0.008;
+                    this.sizes[i] = p.size * (2 - p.life);
+                    this.opacities[i] = p.life * 0.6;
+                    
+                    // Slow down as it rises
+                    p.vy *= 0.98;
+                    
+                    if (p.life <= 0 || this.positions[idx + 1] > p.maxHeight) {
+                        p.active = false;
+                        this.positions[idx + 1] = -100;
+                        this.sizes[i] = 0;
+                        this.opacities[i] = 0;
+                    }
+                }
+                
+                this.geometry.attributes.position.needsUpdate = true;
+                this.geometry.attributes.size.needsUpdate = true;
+                this.geometry.attributes.alpha.needsUpdate = true;
+            }
+        }
+
+        class WindField {
+            constructor() {
+                this.size = 15;
+                this.spacing = 8;
+                this.field = [];
+                this.time = 0;
+                
+                for (let x = 0; x < this.size; x++) {
+                    this.field[x] = [];
+                    for (let y = 0; y < this.size; y++) {
+                        this.field[x][y] = [];
+                        for (let z = 0; z < this.size; z++) {
+                            this.field[x][y][z] = { x: 0, y: 0, z: 0 };
+                        }
+                    }
+                }
+            }
+
+            update(t) {
+                this.time = t * 0.0001;
+                let avg = { x: 0, z: 0, c: 0 };
+                
+                for (let x = 0; x < this.size; x++) {
+                    for (let y = 0; y < this.size; y++) {
+                        for (let z = 0; z < this.size; z++) {
+                            const wx = (x - this.size / 2) * this.spacing;
+                            const wy = y * this.spacing;
+                            const wz = (z - this.size / 2) * this.spacing;
+                            
+                            const vx = Math.sin(wx * 0.03 + this.time) * Math.cos(wz * 0.02 + this.time * 0.5) * 2.5;
+                            const vz = Math.cos(wx * 0.02 + this.time * 0.6) * Math.sin(wz * 0.03 + this.time) * 2.0;
+                            
+                            this.field[x][y][z] = { x: vx, y: 0, z: vz };
+                            
+                            if (y > 3 && y < 8) {
+                                avg.x += vx;
+                                avg.z += vz;
+                                avg.c++;
+                            }
+                        }
+                    }
+                }
+                
+                return { x: avg.x / avg.c, z: avg.z / avg.c };
+            }
+
+            getAt(x, y, z) {
+                const gx = Math.floor((x / this.spacing) + this.size / 2);
+                const gy = Math.floor(y / this.spacing);
+                const gz = Math.floor((z / this.spacing) + this.size / 2);
+                
+                if (gx < 0 || gx >= this.size - 1 || gy < 0 || gy >= this.size - 1 || gz < 0 || gz >= this.size - 1) {
+                    return { x: 0, y: 0, z: 0 };
+                }
+                
+                const fx = (x / this.spacing) + this.size / 2 - gx;
+                const c0 = this.field[gx][gy][gz];
+                const c1 = this.field[gx + 1][gy][gz];
+                
+                return { 
+                    x: (c0.x * (1 - fx) + c1.x * fx) * 0.03, 
+                    y: 0, 
+                    z: c0.z * 0.03 
+                };
+            }
+        }
+
+        class CloudGrowth {
+            constructor() {
+                this.clouds = [];
+                this.group = new THREE.Group();
+                AppState.scene.add(this.group);
+                this.timer = 0;
+                this.max = 50;
+                this.clusterCenters = [];
+                this.updrafts = [];
+            }
+
+            createUpdraft(x, z, strength) {
+                return {
+                    x, z,
+                    strength: strength,
+                    radius: 20 + Math.random() * 15,
+                    height: 0,
+                    maxHeight: 35 + Math.random() * 10,
+                    age: 0,
+                    maxAge: 200 + Math.random() * 150,
+                    active: true
+                };
+            }
+
+            getUpdraftAt(x, z) {
+                let totalLift = 0;
+                for (const updraft of this.updrafts) {
+                    if (!updraft.active) continue;
+                    const dist = Math.sqrt((x - updraft.x) ** 2 + (z - updraft.z) ** 2);
+                    if (dist < updraft.radius) {
+                        const factor = 1 - (dist / updraft.radius);
+                        totalLift += updraft.strength * factor * (updraft.age / updraft.maxAge);
+                    }
+                }
+                return totalLift;
+            }
+
+            isOverWater(x, z) {
+                for (const w of AppState.waterBodies) {
+                    if (Math.sqrt((x - w.x) ** 2 + (z - w.y) ** 2) < w.r) return true;
+                }
+                return false;
+            }
+
+            findNearestCluster(x, z, maxDist = 25) {
+                let nearest = null;
+                let minDist = maxDist;
+                
+                for (const cluster of this.clusterCenters) {
+                    const dist = Math.sqrt((x - cluster.x) ** 2 + (z - cluster.z) ** 2);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = cluster;
+                    }
+                }
+                
+                return nearest;
+            }
+
+            createCluster(x, z) {
+                const cluster = {
+                    x, z,
+                    strength: 0.7 + Math.random() * 0.3,
+                    age: 0,
+                    maxAge: 400 + Math.random() * 300,
+                    hasUpdraft: false
+                };
+                this.clusterCenters.push(cluster);
+                return cluster;
+            }
+
+            makePuff(x, y, z, size, dark, turbulence = 0) {
+                const geo = new THREE.SphereGeometry(size, 8, 8);
+                const scale = 1 + turbulence * 0.3;
+                
+                // More varied shapes for volumetric appearance
+                const scaleX = 0.9 + Math.random() * 0.4 + turbulence * 0.2;
+                const scaleY = 0.7 + Math.random() * 0.5 + turbulence * 0.3;
+                const scaleZ = 1.1 + Math.random() * 0.6 + turbulence * 0.3;
+                geo.scale(scaleX, scaleY, scaleZ);
+                
+                const b = 0.88 - dark * 0.35 - turbulence * 0.1;
+                
+                // Create volumetric appearance with subsurface scattering effect
+                const mat = new THREE.MeshPhongMaterial({
+                    color: new THREE.Color(b, b, b + 0.03),
+                    transparent: true,
+                    opacity: 0.25 + dark * 0.2 + turbulence * 0.08,
+                    depthWrite: false,
+                    fog: true,
+                    emissive: new THREE.Color(b * 0.3, b * 0.3, b * 0.35),
+                    emissiveIntensity: 0.15,
+                    shininess: 5,
+                    specular: new THREE.Color(0xffffff),
+                    flatShading: false
+                });
+
+                const m = new THREE.Mesh(geo, mat);
+                m.position.set(x, y, z);
+                m.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                m.castShadow = true;
+                m.receiveShadow = true;
+                return m;
+            }
+
+            grow(x, z) {
+                if (!this.isOverWater(x, z)) return null;
+                
+                const c = {
+                    x, z, age: 0, 
+                    maxAge: 300 + Math.random() * 200,
+                    baseHeight: 12,
+                    height: 12, 
+                    puffs: [], 
+                    grp: new THREE.Group(), 
+                    dying: false,
+                    cluster: null,
+                    growthRate: 0.025 + Math.random() * 0.025,
+                    mass: 0,
+                    condensationLevel: 0,
+                    turbulence: 0,
+                    velocity: { x: 0, z: 0 },
+                    targetVelocity: { x: 0, z: 0 },
+                    radius: 2,
+                    mergeTimer: 0,
+                    canMerge: true
+                };
+                c.grp.position.set(x, 0, z);
+                this.group.add(c.grp);
+                return c;
+            }
+
+            checkMerge(cloud1, cloud2) {
+                const dist = Math.sqrt((cloud1.x - cloud2.x) ** 2 + (cloud1.z - cloud2.z) ** 2);
+                const minDist = cloud1.radius + cloud2.radius;
+                
+                if (dist < minDist && cloud1.canMerge && cloud2.canMerge && cloud1.age > 50 && cloud2.age > 50) {
+                    return true;
+                }
+                return false;
+            }
+
+            mergeClouds(cloud1, cloud2) {
+                // Transfer mass and puffs from cloud2 to cloud1
+                cloud1.mass += cloud2.mass * 0.8;
+                cloud1.radius = Math.sqrt(cloud1.radius ** 2 + cloud2.radius ** 2);
+                cloud1.maxAge += cloud2.maxAge * 0.3;
+                cloud1.condensationLevel = Math.max(cloud1.condensationLevel, cloud2.condensationLevel);
+                
+                // Move to center of mass
+                const totalMass = cloud1.mass + cloud2.mass;
+                cloud1.x = (cloud1.x * cloud1.mass + cloud2.x * cloud2.mass) / totalMass;
+                cloud1.z = (cloud1.z * cloud1.mass + cloud2.z * cloud2.mass) / totalMass;
+                
+                // Transfer some puffs
+                const transferCount = Math.min(5, cloud2.puffs.length);
+                for (let i = 0; i < transferCount; i++) {
+                    if (cloud2.puffs[i]) {
+                        cloud1.puffs.push(cloud2.puffs[i]);
+                        cloud1.grp.add(cloud2.puffs[i]);
+                    }
+                }
+                
+                // Mark cloud2 for removal
+                cloud2.dying = true;
+                cloud2.maxAge = cloud2.age + 10;
+                
+                // Prevent immediate re-merge
+                cloud1.mergeTimer = 100;
+                cloud1.canMerge = false;
+            }
+
+            update(t) {
+                this.timer++;
+                
+                // Update updrafts
+                this.updrafts = this.updrafts.filter(updraft => {
+                    updraft.age++;
+                    updraft.height = Math.min(updraft.maxHeight, updraft.height + 0.1);
+                    if (updraft.age > updraft.maxAge) {
+                        updraft.active = false;
+                        return false;
+                    }
+                    return true;
+                });
+                
+                // Update cluster centers
+                this.clusterCenters = this.clusterCenters.filter(cluster => {
+                    cluster.age++;
+                    
+                    // Create updraft for mature clusters
+                    if (cluster.age === 50 && !cluster.hasUpdraft && Math.random() > 0.3) {
+                        this.updrafts.push(this.createUpdraft(cluster.x, cluster.z, 0.8 + Math.random() * 0.4));
+                        cluster.hasUpdraft = true;
+                    }
+                    
+                    return cluster.age < cluster.maxAge;
+                });
+                
+                // Spawn new clouds
+                if (this.timer % 25 === 0 && this.clouds.length < this.max) {
+                    const w = AppState.waterBodies[Math.floor(Math.random() * AppState.waterBodies.length)];
+                    const a = Math.random() * Math.PI * 2;
+                    const r = Math.random() * w.r * 0.8;
+                    let spawnX = w.x + Math.cos(a) * r;
+                    let spawnZ = w.y + Math.sin(a) * r;
+                    
+                    // Cloud clumping logic
+                    const nearCluster = this.findNearestCluster(spawnX, spawnZ);
+                    
+                    if (nearCluster && Math.random() < 0.7) {
+                        const clumpAngle = Math.random() * Math.PI * 2;
+                        const clumpDist = 5 + Math.random() * 15;
+                        spawnX = nearCluster.x + Math.cos(clumpAngle) * clumpDist;
+                        spawnZ = nearCluster.z + Math.sin(clumpAngle) * clumpDist;
+                    } else if (Math.random() < 0.3) {
+                        const newCluster = this.createCluster(spawnX, spawnZ);
+                    }
+                    
+                    const c = this.grow(spawnX, spawnZ);
+                    if (c) {
+                        c.cluster = nearCluster;
+                        this.clouds.push(c);
+                    }
+                }
+
+                // Check for cloud merging
+                for (let i = 0; i < this.clouds.length; i++) {
+                    for (let j = i + 1; j < this.clouds.length; j++) {
+                        if (this.checkMerge(this.clouds[i], this.clouds[j])) {
+                            this.mergeClouds(this.clouds[i], this.clouds[j]);
+                            break;
+                        }
+                    }
+                }
+
+                this.clouds = this.clouds.filter(c => {
+                    c.age++;
+                    
+                    // Update merge timer
+                    if (c.mergeTimer > 0) {
+                        c.mergeTimer--;
+                        if (c.mergeTimer === 0) c.canMerge = true;
+                    }
+                    
+                    // Realistic cloud movement
+                    const windAt = AppState.windField.getAt(c.x, c.height, c.z);
+                    c.targetVelocity.x = windAt.x * 0.5;
+                    c.targetVelocity.z = windAt.z * 0.5;
+                    
+                    // Smooth acceleration
+                    c.velocity.x += (c.targetVelocity.x - c.velocity.x) * 0.05;
+                    c.velocity.z += (c.targetVelocity.z - c.velocity.z) * 0.05;
+                    
+                    // Move cloud
+                    c.x += c.velocity.x;
+                    c.z += c.velocity.z;
+                    c.grp.position.x = c.x;
+                    c.grp.position.z = c.z;
+                    
+                    // Add slight drift for mature clouds
+                    if (c.mass > 3) {
+                        c.x += Math.sin(t * 0.0002 + c.age * 0.01) * 0.02;
+                        c.z += Math.cos(t * 0.0002 + c.age * 0.01) * 0.02;
+                    }
+                    
+                    // Enhanced cloud growth system
+                    const updraftLift = this.getUpdraftAt(c.x, c.z);
+                    
+                    // Progressive mass accumulation based on condensation
+                    c.mass += 0.015 + c.condensationLevel * 0.025 + updraftLift * 0.03;
+                    c.condensationLevel = Math.min(1, c.age / 120);
+                    c.turbulence = updraftLift * 0.5;
+                    c.radius = 2 + c.mass * 0.8;
+                    
+                    // Multi-stage growth
+                    let growthStage = 'developing';
+                    if (c.age > 150 && c.mass > 3) growthStage = 'mature';
+                    if (c.age > c.maxAge * 0.7) growthStage = 'dissipating';
+                    
+                    // Enhanced growth rate with stages
+                    let effectiveGrowthRate = c.growthRate;
+                    if (growthStage === 'developing') {
+                        effectiveGrowthRate *= (1 + updraftLift * 3);
+                    } else if (growthStage === 'mature') {
+                        effectiveGrowthRate *= (1 + updraftLift * 1.5);
+                    } else {
+                        effectiveGrowthRate *= 0.5;
+                    }
+                    
+                    if (c.age < c.maxAge * 0.75) {
+                        // Dynamic puff generation
+                        let puffInterval = 5;
+                        if (updraftLift > 0.5) puffInterval = 2;
+                        else if (updraftLift > 0.3) puffInterval = 3;
+                        else if (growthStage === 'mature') puffInterval = 4;
+                        
+                        if (c.age % puffInterval === 0) {
+                            const puffCount = (updraftLift > 0.5 && growthStage === 'developing') ? 3 : (updraftLift > 0.5 ? 2 : 1);
+                            
+                            for (let p = 0; p < puffCount; p++) {
+                                const a = Math.random() * Math.PI * 2;
+                                const d = c.puffs.length * 0.35 + Math.random() * 2;
+                                
+                                // Height affected by updraft and stage
+                                const baseH = c.height + c.age * effectiveGrowthRate;
+                                const h = baseH + updraftLift * 5 + (growthStage === 'mature' ? 2 : 0);
+                                
+                                const dark = Math.min(0.8, (c.age / 180) + c.condensationLevel * 0.4 + (growthStage === 'mature' ? 0.1 : 0));
+                                
+                                // Create multiple overlapping puffs for volumetric depth
+                                const layerCount = (dark > 0.5 || growthStage === 'mature') ? 2 : 1;
+                                for (let layer = 0; layer < layerCount; layer++) {
+                                    const layerOffset = layer * 0.5;
+                                    const puff = this.makePuff(
+                                        Math.cos(a) * d + layerOffset, 
+                                        h + layerOffset * 0.3, 
+                                        Math.sin(a) * d + layerOffset, 
+                                        1.4 + Math.random() * 2.2 + updraftLift * 0.9 + (growthStage === 'mature' ? 0.5 : 0), 
+                                        dark + layer * 0.1,
+                                        c.turbulence
+                                    );
+                                    c.puffs.push(puff);
+                                    c.grp.add(puff);
+                                }
+                                c.height = h;
+                            }
+                        }
+                    }
+                    
+                    if (c.age > c.maxAge) {
+                        c.dying = true;
+                        c.puffs.forEach(p => {
+                            if (p && p.material) p.material.opacity *= 0.97;
+                        });
+                    }
+                    
+                    // Enhanced animation with turbulence
+                    c.puffs.forEach((p, i) => {
+                        if (p) {
+                            p.rotation.y += 0.0002 + c.turbulence * 0.0005;
+                            p.rotation.z += c.turbulence * 0.0003;
+                            
+                            // Updraft effect on existing puffs
+                            const puffLift = this.getUpdraftAt(c.x, c.z) * 0.01;
+                            p.position.y += Math.sin(t * 0.0003 + i) * 0.003 + puffLift;
+                            
+                            // Turbulent motion
+                            if (c.turbulence > 0.2) {
+                                p.position.x += Math.sin(t * 0.0005 + i) * c.turbulence * 0.02;
+                                p.position.z += Math.cos(t * 0.0005 + i) * c.turbulence * 0.02;
+                            }
+                        }
+                    });
+                    
+                    if (c.dying && c.puffs[0] && c.puffs[0].material && c.puffs[0].material.opacity < 0.05) {
+                        c.puffs.forEach(p => {
+                            if (p) {
+                                if (p.geometry) p.geometry.dispose();
+                                if (p.material) p.material.dispose();
+                            }
+                        });
+                        this.group.remove(c.grp);
+                        return false;
+                    }
+                    
+                    return true;
+                });
+            }
+
+            getMature() {
+                return this.clouds.filter(c => c.age > 80 && c.age < c.maxAge * 0.9 && c.mass > 1.5);
+            }
+        }
+
+        class Precipitation {
+            constructor(windFieldRef, cloudSystemRef) {
+                this.windFieldRef = windFieldRef;
+                this.cloudSystemRef = cloudSystemRef;
+                this.max = 3000;
+                this.drops = [];
+                this.vel = [];
+                this.streaks = [];
+                
+                const geo = new THREE.BufferGeometry();
+                this.pos = new Float32Array(this.max * 3);
+                this.sizes = new Float32Array(this.max);
+                
+                for (let i = 0; i < this.max; i++) {
+                    this.drops.push({ active: false });
+                    this.vel.push({ y: 0, size: 0 });
+                    this.pos[i * 3] = 0;
+                    this.pos[i * 3 + 1] = -1000;
+                    this.pos[i * 3 + 2] = 0;
+                    this.sizes[i] = 0;
+                }
+
+                geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+                geo.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = 8;
+                canvas.height = 32;
+                const ctx = canvas.getContext('2d');
+                
+                // Vertical streak gradient
+                const grad = ctx.createLinearGradient(0, 0, 0, 32);
+                grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+                grad.addColorStop(0.3, 'rgba(220, 240, 255, 0.9)');
+                grad.addColorStop(0.7, 'rgba(180, 210, 240, 0.6)');
+                grad.addColorStop(1, 'rgba(150, 180, 210, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 8, 32);
+                
+                const mat = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 0.6,
+                    transparent: true,
+                    opacity: 0.95,
+                    map: new THREE.CanvasTexture(canvas),
+                    depthWrite: false,
+                    sizeAttenuation: true,
+                    blending: THREE.AdditiveBlending
+                });
+
+                this.rain = new THREE.Points(geo, mat);
+                AppState.scene.add(this.rain);
+                
+                // Rain streak lines for heavy rain effect
+                this.createStreakSystem();
+            }
+
+            createStreakSystem() {
+                this.streakGeometry = new THREE.BufferGeometry();
+                const streakPositions = new Float32Array(200 * 6);
+                this.streakGeometry.setAttribute('position', new THREE.BufferAttribute(streakPositions, 3));
+                
+                const streakMaterial = new THREE.LineBasicMaterial({
+                    color: 0xaaccff,
+                    transparent: true,
+                    opacity: 0.3,
+                    linewidth: 1
+                });
+                
+                this.streakLines = new THREE.LineSegments(this.streakGeometry, streakMaterial);
+                AppState.scene.add(this.streakLines);
+            }
+
+            spawn(cx, cz, h) {
+                for (let i = 0; i < this.max; i++) {
+                    if (!this.drops[i].active) {
+                        const idx = i * 3;
+                        this.pos[idx] = cx + (Math.random() - 0.5) * 14;
+                        this.pos[idx + 1] = h;
+                        this.pos[idx + 2] = cz + (Math.random() - 0.5) * 14;
+                        
+                        const s = 0.6 + Math.random() * 2.8;
+                        this.vel[i] = { y: 0.35 + (s / 3) * 0.7, size: s };
+                        this.sizes[i] = s * 0.2;
+                        this.drops[i] = { active: true };
+                        break;
+                    }
+                }
+            }
+
+            update() {
+                const mature = this.cloudSystemRef.getMature();
+                
+                // Spawn from all mature clouds
+                if (mature.length > 0) {
+                    mature.forEach(c => {
+                        const dropCount = 12 + Math.floor(Math.random() * 8);
+                        for (let i = 0; i < dropCount; i++) {
+                            this.spawn(c.x, c.z, c.height - 1);
+                        }
+                    });
+                }
+
+                let active = 0;
+                let streakIdx = 0;
+                const streakPos = this.streakGeometry.attributes.position.array;
+                
+                for (let i = 0; i < this.max; i++) {
+                    if (!this.drops[i].active) continue;
+                    
+                    const idx = i * 3;
+                    const w = this.windFieldRef.getAt(this.pos[idx], this.pos[idx + 1], this.pos[idx + 2]);
+                    
+                    const oldY = this.pos[idx + 1];
+                    this.pos[idx + 1] -= this.vel[i].y;
+                    this.pos[idx] += w.x * (1 / this.vel[i].size);
+                    this.pos[idx + 2] += w.z * (1 / this.vel[i].size);
+                    
+                    // Create streak lines for fast drops
+                    if (streakIdx < 200 && this.vel[i].y > 0.5 && Math.random() < 0.15) {
+                        const si = streakIdx * 6;
+                        streakPos[si] = this.pos[idx];
+                        streakPos[si + 1] = oldY;
+                        streakPos[si + 2] = this.pos[idx + 2];
+                        streakPos[si + 3] = this.pos[idx];
+                        streakPos[si + 4] = this.pos[idx + 1];
+                        streakPos[si + 5] = this.pos[idx + 2];
+                        streakIdx++;
+                    }
+                    
+                    if (this.pos[idx + 1] < 0.5) {
+                        this.drops[i].active = false;
+                        this.pos[idx] = 0;
+                        this.pos[idx + 1] = -1000;
+                        this.pos[idx + 2] = 0;
+                        this.sizes[i] = 0;
+                    } else {
+                        active++;
+                    }
+                }
+                
+                // Clear remaining streak positions
+                for (let i = streakIdx * 6; i < 200 * 6; i++) {
+                    streakPos[i] = 0;
+                }
+                
+                this.rain.geometry.attributes.position.needsUpdate = true;
+                this.rain.geometry.attributes.size.needsUpdate = true;
+                this.streakGeometry.attributes.position.needsUpdate = true;
+                return active;
+            }
+        }
+
+        class Lightning {
+            constructor(cloudSystemRef) {
+                this.cloudSystemRef = cloudSystemRef;
+                this.bolts = [];
+                this.charge = 0;
+                this.threshold = 100;
+                this.last = 0;
+                this.count = 0;
+                this.flash = new THREE.PointLight(0xddeeff, 0, 200);
+                AppState.scene.add(this.flash);
+            }
+
+            createSteppedLeader(sx, sy, sz, ex, ey, ez) {
+                const segments = [];
+                const steps = 25 + Math.floor(Math.random() * 10);
+                let currentX = sx, currentY = sy, currentZ = sz;
+                
+                for (let i = 0; i < steps; i++) {
+                    const t = i / steps;
+                    const targetX = sx + (ex - sx) * t;
+                    const targetY = sy + (ey - sy) * t - Math.pow(t, 1.5) * 5;
+                    const targetZ = sz + (ez - sz) * t;
+                    
+                    // Stepped leader movement
+                    const stepSize = 2 + Math.random() * 3;
+                    const chaos = (1 - Math.abs(t - 0.5) * 2) * 6;
+                    
+                    currentX += (targetX - currentX) * 0.3 + (Math.random() - 0.5) * chaos;
+                    currentY += (targetY - currentY) * 0.3 + (Math.random() - 0.5) * stepSize;
+                    currentZ += (targetZ - currentZ) * 0.3 + (Math.random() - 0.5) * chaos;
+                    
+                    segments.push(new THREE.Vector3(currentX, currentY, currentZ));
+                }
+                
+                return segments;
+            }
+
+            createBranch(originPoint, depth = 0, maxDepth = 3) {
+                if (depth >= maxDepth || Math.random() > 0.7) return;
+                
+                const branches = 1 + Math.floor(Math.random() * 2);
+                
+                for (let b = 0; b < branches; b++) {
+                    const branchLength = 8 + Math.random() * 12 * (1 - depth / maxDepth);
+                    const branchSteps = 6 + Math.floor(Math.random() * 6);
+                    const branchPoints = [];
+                    
+                    let bx = originPoint.x;
+                    let by = originPoint.y;
+                    let bz = originPoint.z;
+                    
+                    const angleH = Math.random() * Math.PI * 2;
+                    const angleV = (Math.random() - 0.3) * Math.PI * 0.5;
+                    
+                    for (let i = 0; i <= branchSteps; i++) {
+                        const t = i / branchSteps;
+                        const len = branchLength * t;
+                        
+                        bx += Math.cos(angleH) * Math.cos(angleV) * (branchLength / branchSteps) + (Math.random() - 0.5) * 2;
+                        by -= Math.sin(angleV) * (branchLength / branchSteps) + Math.random() * 1.5;
+                        bz += Math.sin(angleH) * Math.cos(angleV) * (branchLength / branchSteps) + (Math.random() - 0.5) * 2;
+                        
+                        branchPoints.push(new THREE.Vector3(bx, by, bz));
+                    }
+                    
+                    const opacity = 0.7 - depth * 0.15;
+                    const branchGeom = new THREE.BufferGeometry().setFromPoints(branchPoints);
+                    const branchMat = new THREE.LineBasicMaterial({
+                        color: 0xccddff,
+                        transparent: true,
+                        opacity: opacity,
+                        linewidth: 2
+                    });
+                    
+                    const branch = new THREE.Line(branchGeom, branchMat);
+                    branch.userData.life = 0.9 - depth * 0.1;
+                    AppState.scene.add(branch);
+                    this.bolts.push(branch);
+                    
+                    // Recursive branching
+                    if (Math.random() > 0.5) {
+                        this.createBranch(branchPoints[Math.floor(branchPoints.length / 2)], depth + 1, maxDepth);
+                    }
+                }
+            }
+
+            makeBolt(sx, sy, sz, ex, ey, ez) {
+                // Main channel with stepped leader
+                const mainPath = this.createSteppedLeader(sx, sy, sz, ex, ey, ez);
+                
+                const mainGeom = new THREE.BufferGeometry().setFromPoints(mainPath);
+                const mainMat = new THREE.LineBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 1,
+                    linewidth: 3
+                });
+
+                const mainBolt = new THREE.Line(mainGeom, mainMat);
+                mainBolt.userData.life = 1.0;
+                mainBolt.userData.isMain = true;
+                AppState.scene.add(mainBolt);
+                this.bolts.push(mainBolt);
+
+                // Create glow effect
+                const glowGeom = new THREE.BufferGeometry().setFromPoints(mainPath);
+                const glowMat = new THREE.LineBasicMaterial({
+                    color: 0xaaccff,
+                    transparent: true,
+                    opacity: 0.4,
+                    linewidth: 5
+                });
+                const glow = new THREE.Line(glowGeom, glowMat);
+                glow.userData.life = 0.8;
+                AppState.scene.add(glow);
+                this.bolts.push(glow);
+
+                // Create complex branching from multiple points
+                const branchPoints = [
+                    Math.floor(mainPath.length * 0.2),
+                    Math.floor(mainPath.length * 0.4),
+                    Math.floor(mainPath.length * 0.6),
+                    Math.floor(mainPath.length * 0.8)
+                ];
+
+                branchPoints.forEach(idx => {
+                    if (Math.random() > 0.3) {
+                        this.createBranch(mainPath[idx], 0, 2);
+                    }
+                });
+
+                // Add return stroke (bright flash along main path)
+                setTimeout(() => {
+                    if (mainBolt && mainBolt.material) {
+                        mainBolt.material.opacity = 1.2;
+                        mainBolt.material.emissive = new THREE.Color(0xffffff);
+                        mainBolt.material.emissiveIntensity = 2;
+                    }
+                }, 50);
+            }
+
+            strike() {
+                const mature = this.cloudSystemRef.getMature();
+                if (mature.length === 0) return;
+                
+                const c = mature[Math.floor(Math.random() * mature.length)];
+                const sx = c.x + (Math.random() - 0.5) * 10;
+                const sz = c.z + (Math.random() - 0.5) * 10;
+                
+                // Cloud-to-ground strike
+                this.makeBolt(sx, c.height + 5, sz, sx + (Math.random() - 0.5) * 25, 0.5, sz + (Math.random() - 0.5) * 25);
+                
+                // Occasional cloud-to-cloud
+                if (Math.random() > 0.6 && mature.length > 1) {
+                    const c2 = mature[Math.floor(Math.random() * mature.length)];
+                    this.makeBolt(
+                        sx, c.height + 3, sz,
+                        c2.x + (Math.random() - 0.5) * 8, c2.height + 2, c2.z + (Math.random() - 0.5) * 8
+                    );
+                }
+                
+                this.flash.intensity = 35;
+                this.flash.position.set(sx, c.height, sz);
+                this.count++;
+                this.last = performance.now();
+                
+                // Intense camera shake
+                const dist = Math.sqrt(sx * sx + sz * sz);
+                const shakeIntensity = Math.max(0.5, 2 - dist / 80);
+                AppState.cameraControls.shake.intensity = 2 + shakeIntensity * 4;
+                AppState.cameraControls.shake.duration = 0;
+            }
+
+            update(t) {
+                const mature = this.cloudSystemRef.getMature();
+                this.charge += 0.25 * mature.length;
+                
+                if (this.charge > this.threshold && t - this.last > 1200 && mature.length > 0) {
+                    if (Math.random() > 0.4) {
+                        this.strike();
+                        this.charge = Math.random() * 40;
+                    }
+                }
+
+                this.flash.intensity *= 0.75;
+                
+                this.bolts = this.bolts.filter(b => {
+                    const fadeSpeed = b.userData.isMain ? 0.15 : 0.12;
+                    b.userData.life -= fadeSpeed;
+                    b.material.opacity = b.userData.life;
+                    
+                    if (b.userData.life <= 0) {
+                        AppState.scene.remove(b);
+                        if (b.geometry) b.geometry.dispose();
+                        if (b.material) b.material.dispose();
+                        return false;
+                    }
+                    return true;
+                });
+            }
+        }
+
+        function setupControls() {
+            // Mouse controls
+            AppState.renderer.domElement.addEventListener('mousedown', e => {
+                AppState.cameraControls.isDrag = true;
+                AppState.cameraControls.prevMouse = { x: e.clientX, y: e.clientY };
+            });
+
+            AppState.renderer.domElement.addEventListener('mousemove', e => {
+                if (!AppState.cameraControls.isDrag) return;
+                const dx = e.clientX - AppState.cameraControls.prevMouse.x;
+                const dy = e.clientY - AppState.cameraControls.prevMouse.y;
+                AppState.cameraControls.rotation.theta -= dx * 0.005;
+                AppState.cameraControls.rotation.phi -= dy * 0.005;
+                AppState.cameraControls.rotation.phi = Math.max(0.1, Math.min(Math.PI / 2.2, AppState.cameraControls.rotation.phi));
+                AppState.cameraControls.prevMouse = { x: e.clientX, y: e.clientY };
+            });
+
+            AppState.renderer.domElement.addEventListener('mouseup', () => {
+                AppState.cameraControls.isDrag = false;
+            });
+
+            AppState.renderer.domElement.addEventListener('wheel', e => {
+                e.preventDefault();
+                AppState.cameraControls.distance = Math.max(35, Math.min(150, AppState.cameraControls.distance + e.deltaY * 0.08));
+            }, { passive: false });
+
+            // Touch controls
+            let touchStartPos = null;
+            let touchStartDist = null;
+
+            AppState.renderer.domElement.addEventListener('touchstart', e => {
+                if (e.touches.length === 1) {
+                    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                } else if (e.touches.length === 2) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    touchStartDist = Math.sqrt(dx * dx + dy * dy);
+                }
+            });
+
+            AppState.renderer.domElement.addEventListener('touchmove', e => {
+                e.preventDefault();
+                
+                if (e.touches.length === 1 && touchStartPos) {
+                    const dx = e.touches[0].clientX - touchStartPos.x;
+                    const dy = e.touches[0].clientY - touchStartPos.y;
+                    AppState.cameraControls.rotation.theta -= dx * 0.005;
+                    AppState.cameraControls.rotation.phi -= dy * 0.005;
+                    AppState.cameraControls.rotation.phi = Math.max(0.1, Math.min(Math.PI / 2.2, AppState.cameraControls.rotation.phi));
+                    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                } else if (e.touches.length === 2 && touchStartDist) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const delta = touchStartDist - dist;
+                    AppState.cameraControls.distance = Math.max(35, Math.min(150, AppState.cameraControls.distance + delta * 0.5));
+                    touchStartDist = dist;
+                }
+            }, { passive: false });
+
+            AppState.renderer.domElement.addEventListener('touchend', () => {
+                touchStartPos = null;
+                touchStartDist = null;
+            });
+
+            // Keyboard controls
+            window.addEventListener('keypress', e => {
+                if (e.key === 'h' || e.key === 'H') {
+                    AppState.showGui = !AppState.showGui;
+                    ['stats', 'controls', 'info'].forEach(id => {
+                        document.getElementById(id).classList.toggle('hidden', !AppState.showGui);
+                    });
+                    document.getElementById('toggle-gui').textContent = AppState.showGui ? '👁️ Hide GUI' : '👁️ Show GUI';
+                }
+            });
+
+            document.getElementById('toggle-gui').addEventListener('click', () => {
+                const e = new KeyboardEvent('keypress', { key: 'h' });
+                window.dispatchEvent(e);
+            });
+
+            window.addEventListener('resize', () => {
+                AppState.camera.aspect = window.innerWidth / window.innerHeight;
+                AppState.camera.updateProjectionMatrix();
+                AppState.renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function init() {
+            AppState.scene = new THREE.Scene();
+            AppState.scene.background = new THREE.Color(0x5a7a95);
+            AppState.scene.fog = new THREE.Fog(0x5a7a95, 100, 350);
+
+            AppState.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+            AppState.camera.position.set(0, 25, 70);
+
+            AppState.renderer = new THREE.WebGLRenderer({ antialias: true });
+            AppState.renderer.setSize(window.innerWidth, window.innerHeight);
+            AppState.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            AppState.renderer.shadowMap.enabled = true;
+            document.getElementById('canvas-container').appendChild(AppState.renderer.domElement);
+
+            const ambient = new THREE.AmbientLight(0x808fa0, 1.2);
+            AppState.scene.add(ambient);
+
+            const sun = new THREE.DirectionalLight(0xfffae6, 1.5);
+            sun.position.set(60, 50, 80);
+            sun.castShadow = true;
+            sun.shadow.camera.left = sun.shadow.camera.bottom = -70;
+            sun.shadow.camera.right = sun.shadow.camera.top = 70;
+            sun.shadow.mapSize.width = sun.shadow.mapSize.height = 1024;
+            AppState.scene.add(sun);
+
+            const back = new THREE.DirectionalLight(0xffd9a8, 0.8);
+            back.position.set(-50, 40, -60);
+            AppState.scene.add(back);
+
+            createTerrain();
+            
+            AppState.windField = new WindField();
+            AppState.evaporationSystem = new EvaporationSystem();
+            AppState.cloudSystem = new CloudGrowth();
+            AppState.rainSystem = new Precipitation(AppState.windField, AppState.cloudSystem);
+            AppState.lightningSystem = new Lightning(AppState.cloudSystem);
+            
+            setupControls();
+        }
+
+        let frames = 0;
+        let lastFps = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = performance.now();
+
+            const ws = AppState.windField.update(t);
+            const windSpeed = Math.sqrt(ws.x * ws.x + ws.z * ws.z);
+            
+            AppState.evaporationSystem.update();
+            AppState.cloudSystem.update(t);
+            const activePart = AppState.rainSystem.update();
+            AppState.lightningSystem.update(t);
+
+            // Update camera shake
+            const shake = AppState.cameraControls.shake;
+            
+            if (shake.intensity > 0.01) {
+                // Multi-frequency layered shake for realism
+                const time = t * 0.001;
+                const highFreq = Math.sin(time * 50) * Math.cos(time * 47);
+                const midFreq = Math.sin(time * 20) * Math.cos(time * 23);
+                const lowFreq = Math.sin(time * 8) * Math.cos(time * 9);
+                
+                const intensity = shake.intensity;
+                shake.x = (Math.random() - 0.5) * intensity * 1.5 + highFreq * intensity * 0.3 + midFreq * intensity * 0.2;
+                shake.y = (Math.random() - 0.5) * intensity + midFreq * intensity * 0.3 + lowFreq * intensity * 0.2;
+                shake.z = (Math.random() - 0.5) * intensity * 1.5 + highFreq * intensity * 0.25 + lowFreq * intensity * 0.25;
+                
+                // Faster decay for more responsive feel
+                shake.intensity *= 0.88;
+                
+                // Add aftershock rumble
+                if (shake.intensity < 0.4 && shake.intensity > 0.05) {
+                    shake.x += Math.sin(time * 15) * 0.08;
+                    shake.y += Math.cos(time * 12) * 0.05;
+                    shake.z += Math.sin(time * 18) * 0.08;
+                }
+            } else {
+                // Smooth stop
+                shake.x *= 0.75;
+                shake.y *= 0.75;
+                shake.z *= 0.75;
+                if (Math.abs(shake.x) < 0.001) shake.x = 0;
+                if (Math.abs(shake.y) < 0.001) shake.y = 0;
+                if (Math.abs(shake.z) < 0.001) shake.z = 0;
+            }
+
+            const ctrl = AppState.cameraControls;
+            const baseX = ctrl.distance * Math.sin(ctrl.rotation.theta) * Math.cos(ctrl.rotation.phi);
+            const baseY = ctrl.distance * Math.sin(ctrl.rotation.phi);
+            const baseZ = ctrl.distance * Math.cos(ctrl.rotation.theta) * Math.cos(ctrl.rotation.phi);
+            
+            AppState.camera.position.x = baseX + ctrl.shake.x;
+            AppState.camera.position.y = baseY + ctrl.shake.y;
+            AppState.camera.position.z = baseZ + ctrl.shake.z;
+            AppState.camera.lookAt(ctrl.shake.x * 0.5, 20 + ctrl.shake.y * 0.5, ctrl.shake.z * 0.5);
+
+            AppState.renderer.render(AppState.scene, AppState.camera);
+
+            frames++;
+            if (t - lastFps > 1000) {
+                document.getElementById('fps').textContent = frames;
+                document.getElementById('particles').textContent = activePart;
+                document.getElementById('clouds').textContent = AppState.cloudSystem.clouds.length;
+                document.getElementById('charge').textContent = Math.floor(AppState.lightningSystem.charge);
+                document.getElementById('strikes').textContent = AppState.lightningSystem.count;
+                document.getElementById('wind').textContent = windSpeed.toFixed(1);
+                frames = 0;
+                lastFps = t;
+            }
+        }
+
+        init();
+        animate();
+    </script>
 </body>
-</html>
+    </html>
