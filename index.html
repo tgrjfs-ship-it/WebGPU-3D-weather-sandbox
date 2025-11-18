@@ -12,63 +12,76 @@
             position: absolute;
             background: rgba(0, 0, 0, 0.75);
             color: white;
-            padding: 16px;
+            padding: 12px;
             border-radius: 12px;
             font-size: 14px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: transform 240ms ease, opacity 240ms ease;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
         }
-        #stats { top: 16px; left: 16px; }
-        #controls { bottom: 16px; left: 16px; font-size: 12px; }
-        #info { bottom: 16px; right: 16px; font-size: 12px; }
+        #stats { top: 16px; left: 16px; width: 220px; }
+        #controls { bottom: 16px; left: 16px; font-size: 12px; width: 240px; }
+        #info { bottom: 16px; right: 16px; font-size: 12px; width: 180px; text-align:center; }
         #toggle-gui {
             position: absolute;
-            top: 16px;
-            right: 16px;
-            background: rgba(0, 0, 0, 0.75);
+            top: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.85);
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 8px 12px;
+            border-radius: 10px;
             cursor: pointer;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s;
+            font-size: 13px;
+            backdrop-filter: blur(6px);
+            transition: transform 200ms ease;
+            z-index: 100;
         }
-        #toggle-gui:hover { background: rgba(0, 0, 0, 0.9); }
+        #toggle-gui:hover { transform: translateY(-2px); }
         .stat-value { color: #6cf; font-weight: bold; }
         .hidden { display: none; }
-        .title { color: #6cf; font-weight: bold; margin-bottom: 12px; }
+        .title { color: #6cf; font-weight: bold; margin-bottom: 10px; }
+        /* align top-right control buttons in a compact stack */
+        .top-right-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            gap: 8px;
+            z-index: 110;
+        }
+        /* slightly nudge other top buttons to avoid overlap when stacked */
+        #pause-btn, #fp-toggle, #reset-btn { top: 12px; }
         /* Pause button styling */
         #pause-btn {
-            position: absolute;
-            top: 16px;
-            right: 120px;
+            position: relative;
             background: rgba(0, 0, 0, 0.75);
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 8px 12px;
+            border-radius: 10px;
             cursor: pointer;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s;
+            font-size: 13px;
+            backdrop-filter: blur(6px);
+            transition: transform 200ms ease;
         }
-        #pause-btn:hover { background: rgba(0, 0, 0, 0.9); }
+        #pause-btn:hover { transform: translateY(-2px); }
+
         #graphics {
             position: absolute;
             right: 16px;
             top: 120px;
-            width: 220px;
+            width: 240px;
             background: rgba(0, 0, 0, 0.75);
             color: white;
-            padding: 16px;
+            padding: 12px;
             border-radius: 12px;
             font-size: 12px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             flex-direction: column;
             gap: 8px;
@@ -76,6 +89,60 @@
         #shadow-toggle, #rainshaft-toggle, #lightning-toggle, #particle-range, #cloud-range, #px-range {
             margin-left: auto;
         }
+
+        /* Collapsed UI state: panels slide and fade */
+        body.ui-collapsed .ui-panel {
+            transform: translateY(10px) scale(0.985);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* compact small label that appears when controls hidden */
+        #reopen-controls {
+            display: none;
+        }
+        body.ui-collapsed #reopen-controls {
+            display: block;
+            position: absolute;
+            left: 12px;
+            bottom: 12px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.72);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.06);
+            z-index: 150;
+        }
+
+        /* Joystick zones - keep touch targets large and unobtrusive */
+        .joy-zone {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            z-index: 60;
+            touch-action: none;
+            opacity: 0.0001; /* invisible but active */
+        }
+        #joy-look { right: 12px; bottom: 12px; }
+        #joy-move { left: 12px; bottom: 12px; }
+
+        /* first-person HUD mode label */
+        #fp-toggle {
+            position: absolute;
+            top: 12px;
+            right: 196px;
+            background: rgba(0,0,0,0.75);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 100;
+            font-family:'Courier New', monospace;
+            font-size:13px;
+            backdrop-filter: blur(6px);
+        }
+        #fp-toggle.active { background: rgba(108, 204, 255, 0.12); color: #6cf; border-color: rgba(108,204,255,0.16); }
     </style>
 </head>
 <body>
@@ -88,7 +155,9 @@
         <div>Charge: <span class="stat-value" id="charge">0</span>%</div>
         <div>Strikes: <span class="stat-value" id="strikes">0</span></div>
         <div>Wind: <span class="stat-value" id="wind">0</span> m/s</div>
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 11px; color: #888;">
+        <div>CPU Cores: <span class="stat-value" id="cpu">—</span></div>
+        <div>GPU: <span class="stat-value" id="gpu">—</span></div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 11px; color: #aaa;">
             <div>• Clouds form over water</div>
             <div>• Evaporation & condensation</div>
             <div>• Wind-driven cloud movement</div>
@@ -99,14 +168,15 @@
     <div id="controls" class="ui-panel">
         <div style="color: #ccc; margin-bottom: 8px; font-weight: bold;">Controls</div>
         <div style="color: #aaa; font-size: 11px;">
-            <div>🖱️ <strong>Mouse Drag</strong> - Rotate camera</div>
-            <div>🖲️ <strong>Mouse Wheel</strong> - Zoom in/out</div>
-            <div>👆 <strong>Touch Drag</strong> - Rotate camera</div>
+            <div>🖱️ <strong>Mouse Drag</strong> - Rotate camera (orbit) / Look (FP)</div>
+            <div>🖲️ <strong>Mouse Wheel</strong> - Zoom (orbit)</div>
+            <div>👆 <strong>Touch Drag</strong> - Rotate</div>
             <div>🤏 <strong>Pinch</strong> - Zoom in/out</div>
             <div>⌨️ <strong>H Key</strong> - Hide/Show GUI</div>
+            <div style="margin-top:6px;">WASD - Move (FP), Shift - Run</div>
         </div>
     </div>
-    <div id="graphics" class="ui-panel" style="right:16px; top:120px; width:220px;">
+    <div id="graphics" class="ui-panel" style="right:16px; top:120px; width:240px;">
         <div style="color:#6cf; font-weight:bold; margin-bottom:8px;">Graphics</div>
         <div style="font-size:12px; color:#ddd; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div>Shadows</div>
@@ -128,6 +198,13 @@
             <div style="margin-bottom:4px;">Cloud Detail</div>
             <input id="cloud-range" type="range" min="10" max="200" step="10" value="50" style="width:100%;" />
         </div>
+        <div style="font-size:12px; color:#ddd; margin-bottom:8px;">
+            <div style="margin-bottom:4px;">Cloud Mode</div>
+            <select id="cloud-mode" style="width:100%; padding:6px; border-radius:6px; background:rgba(0,0,0,0.6); color:#fff; border:1px solid rgba(255,255,255,0.06);">
+                <option value="volumetric">Volumetric</option>
+                <option value="particles">Particles</option>
+            </select>
+        </div>
         <div style="font-size:12px; color:#ddd;">
             <div style="margin-bottom:4px;">Pixel Ratio</div>
             <input id="px-range" type="range" min="0.5" max="2" step="0.1" value="1" style="width:100%;" />
@@ -137,8 +214,11 @@
         <div style="color: #6cf; font-weight: bold;">Storm Simulator v5.0</div>
         <div style="color: #888;">Physically Based Weather</div>
     </div>
-    <button id="pause-btn">⏸ Pause</button>
-    <button id="toggle-gui">👁️ Hide GUI</button>
+    <div class="top-right-controls">
+        <button id="toggle-gui">👁️ Hide UI</button>
+        <button id="pause-btn">⏸ Pause</button>
+        <button id="reset-btn" style="background: rgba(0,0,0,0.75); color:white; border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:10px; cursor:pointer; font-family:'Courier New', monospace; font-size:13px; backdrop-filter: blur(6px);">🔄 Reset</button>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
@@ -155,12 +235,17 @@
             evaporationSystem: null,
             waterBodies: [],
             paused: false,
+            firstPerson: false,
             cameraControls: {
                 isDrag: false,
                 prevMouse: { x: 0, y: 0 },
-                rotation: { theta: 0, phi: Math.PI / 5.5 },
+                rotation: { yaw: 0, pitch: 0, theta: 0, phi: Math.PI / 5.5 },
                 distance: 70,
-                shake: { x: 0, y: 0, z: 0, intensity: 0 }
+                maxDistance: 300,
+                move: { forward: 0, right: 0 },
+                speed: 0.5,
+                runMultiplier: 2.0,
+                shake: { intensity: 0, duration: 0, frequency: 20, time: 0, targetOffset: { x: 0, y: 0, z: 0 } }
             }
         };
 
@@ -171,18 +256,38 @@
             lightning: true,
             particleDetail: 300,
             cloudDetail: 50,
-            pixelRatio: 1
+            pixelRatio: 1,
+            volumetric: true,
+            volumetricDensity: 0.45,
+            volumetricResolution: 12,
+            cloudRenderMode: 'volumetric'
         };
 
+        // environmental helper: temperature (°C) and humidity (0..1) estimate at position
+        function sampleEnvironment(x, z, altitude = 12) {
+            // simple lapse rate: 15°C at sea level, -6.5°C per km
+            const temp = 15 - (altitude / 1000) * 6.5;
+            // humidity base: higher near water bodies, falloff with distance
+            let h = 0.25; // background humidity
+            for (const w of AppState.waterBodies || []) {
+                const dist = Math.sqrt((x - w.x) ** 2 + (z - w.y) ** 2);
+                const influence = Math.max(0, 1 - dist / (w.r * 2.5));
+                h = Math.max(h, 0.6 * influence + 0.25);
+            }
+            // add small stochastic / diurnal variation based on position to avoid uniformity
+            h = Math.min(1, h + Math.sin((x + z) * 0.007) * 0.05 + (Math.random() - 0.5) * 0.03);
+            return { temperature: temp, humidity: h };
+        }
+
         function createTerrain() {
-            const geo = new THREE.PlaneGeometry(400, 400, 100, 100);
+            const geo = new THREE.PlaneGeometry(800, 800, 160, 160);
             const pos = geo.attributes.position.array;
             const col = new Float32Array(pos.length);
 
             AppState.waterBodies = [
-                { x: 0, y: 0, r: 50, d: -2 },
-                { x: -80, y: 60, r: 35, d: -1.5 },
-                { x: 100, y: -70, r: 40, d: -1.8 }
+                { x: 0, y: 0, r: 90, d: -2.5 },
+                { x: -160, y: 120, r: 70, d: -1.8 },
+                { x: 200, y: -140, r: 80, d: -2.0 }
             ];
 
             for (let i = 0; i < pos.length; i += 3) {
@@ -476,7 +581,41 @@
             }
 
             makePuff(x, y, z, size, dark, turbulence = 0) {
-                const geo = new THREE.SphereGeometry(size, 12, 12);
+                // use volumetric resolution from Graphics to adjust geometry detail for performance
+                const res = Math.max(4, Math.floor(Graphics.volumetricResolution));
+                
+                if (Graphics.cloudRenderMode === 'particles') {
+                    // Create a soft particle sprite instead of a mesh puff
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+                    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+                    const baseAlpha = 0.85;
+                    grad.addColorStop(0, `rgba(255,255,255,${baseAlpha})`);
+                    grad.addColorStop(0.4, `rgba(240,245,255,${baseAlpha * 0.6})`);
+                    grad.addColorStop(1, 'rgba(200,220,240,0)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, 64, 64);
+
+                    const spriteMap = new THREE.CanvasTexture(canvas);
+                    const material = new THREE.SpriteMaterial({
+                        map: spriteMap,
+                        color: new THREE.Color(1, 1, 1),
+                        transparent: true,
+                        opacity: Graphics.volumetric ? (0.45 + dark * 0.25) * Graphics.volumetricDensity : 0.4,
+                        depthWrite: false,
+                        blending: THREE.NormalBlending
+                    });
+                    const sprite = new THREE.Sprite(material);
+                    const scale = size * (0.6 + Math.random() * 0.9 + turbulence * 0.5);
+                    sprite.scale.set(scale * (0.9 + Math.random() * 0.4), scale * (0.6 + Math.random() * 0.6), 1);
+                    sprite.position.set(x, y, z);
+                    sprite.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                    return sprite;
+                }
+
+                // volumetric mesh puff (existing approach)
+                const geo = new THREE.SphereGeometry(size, res, Math.max(4, Math.floor(res * 0.8)));
                 
                 // Highly varied shapes for realistic cumulus appearance
                 const scaleX = 0.85 + Math.random() * 0.5 + turbulence * 0.15;
@@ -491,10 +630,13 @@
                 const b = baseBrightness + (topBrightness - baseBrightness) * heightFactor;
                 
                 // Use Lambert for soft, realistic lighting
+                // modulate opacity by volumetric density control and optionally disable volumetric for flat puffs
+                const baseOpacity = 0.45 + dark * 0.25 + turbulence * 0.1;
+                const opacity = Graphics.volumetric ? baseOpacity * Graphics.volumetricDensity : Math.min(1, baseOpacity * 0.75);
                 const mat = new THREE.MeshLambertMaterial({
                     color: new THREE.Color(b, b, b + 0.02),
                     transparent: true,
-                    opacity: 0.45 + dark * 0.25 + turbulence * 0.1,
+                    opacity: opacity,
                     depthWrite: false
                 });
                 mat.fog = true;
@@ -508,8 +650,17 @@
             }
 
             grow(x, z) {
-                if (!this.isOverWater(x, z)) return null;
-                
+                // Allow cloud formation anywhere but only when local temperature/humidity permit
+                const env = sampleEnvironment(x, z, 12);
+                const humidityThreshold = 0.38; // minimum humidity to form clouds
+                const tempThreshold = -10; // unrealistic cold min (keeps very hot areas from forming clouds)
+                // Cloud formation chance based on humidity and a reasonable temperature window (-15..30)
+                const tempOk = env.temperature > tempThreshold && env.temperature < 35;
+                const humidityOk = env.humidity >= humidityThreshold;
+                if (!tempOk || !humidityOk || Math.random() > Math.min(1, (env.humidity - humidityThreshold) * 3 + 0.25)) {
+                    return null;
+                }
+
                 // Variable width for different cloud types - slightly wider by default
                 const widthFactor = 1.1 + Math.random() * 0.8; // 1.1 to 1.9
                 
@@ -638,28 +789,27 @@
                 
                 // Spawn new clouds
                 if (this.timer % 25 === 0 && this.clouds.length < this.max) {
-                    const w = AppState.waterBodies[Math.floor(Math.random() * AppState.waterBodies.length)];
-                    const a = Math.random() * Math.PI * 2;
-                    const r = Math.random() * w.r * 0.8;
-                    let spawnX = w.x + Math.cos(a) * r;
-                    let spawnZ = w.y + Math.sin(a) * r;
-                    
-                    // Cloud clumping logic
-                    const nearCluster = this.findNearestCluster(spawnX, spawnZ);
-                    
-                    if (nearCluster && Math.random() < 0.7) {
-                        const clumpAngle = Math.random() * Math.PI * 2;
-                        const clumpDist = 5 + Math.random() * 15;
-                        spawnX = nearCluster.x + Math.cos(clumpAngle) * clumpDist;
-                        spawnZ = nearCluster.z + Math.sin(clumpAngle) * clumpDist;
-                    } else if (Math.random() < 0.3) {
-                        const newCluster = this.createCluster(spawnX, spawnZ);
-                    }
-                    
-                    const c = this.grow(spawnX, spawnZ);
-                    if (c) {
-                        c.cluster = nearCluster;
-                        this.clouds.push(c);
+                    // allow spawn anywhere over the terrain; environmental checks inside grow()
+                    const span = 400; // half-size of terrain (matches terrain 800x800)
+                    let attempts = 0;
+                    let c = null;
+                    while (!c && attempts < 5) {
+                        const spawnX = (Math.random() * 2 - 1) * span;
+                        const spawnZ = (Math.random() * 2 - 1) * span;
+
+                        // Cloud clumping logic using clusters even away from water
+                        const nearCluster = this.findNearestCluster(spawnX, spawnZ);
+
+                        if (!nearCluster && Math.random() < 0.3) {
+                            this.createCluster(spawnX, spawnZ);
+                        }
+
+                        c = this.grow(spawnX, spawnZ);
+                        if (c) {
+                            c.cluster = nearCluster;
+                            this.clouds.push(c);
+                        }
+                        attempts++;
                     }
                 }
 
@@ -858,7 +1008,7 @@
                                 if (p.material) p.material.dispose();
                             }
                         });
-                        this.group.remove(c.grp);
+                        AppState.cloudSystem.group.remove(c.grp);
                         return false;
                     }
                     
@@ -997,10 +1147,6 @@
                         this.pos[idx] = 0;
                         this.pos[idx + 1] = -1000;
                         this.pos[idx + 2] = 0;
-                        this.sizes[i] = 0;
-                        this.colors[idx] = 1;
-                        this.colors[idx + 1] = 1;
-                        this.colors[idx + 2] = 1;
                     }
                 }
 
@@ -1045,6 +1191,15 @@
                 const h = cloud.height - 1;
                 const radius = Math.max(5, cloud.radius * 0.8); // local shaft radius
 
+                // sample near-surface environment; suppress precipitation in dry columns
+                const env = sampleEnvironment(cx, cz, 0);
+                if (env.humidity < 0.35) return;
+
+                // Precipitation intensity scales with cloud height and maturity:
+                // taller clouds (higher cloud.height) make heavier precipitation
+                const heightFactor = Math.max(0.8, 1 + (cloud.height - 12) * 0.04); // ~1.0 at 12, increases with height
+                const maturityFactor = Math.min(1.5, 0.6 + cloud.condensationLevel); // scales with condensation
+
                 for (let i = 0; i < this.max; i++) {
                     if (!this.drops[i].active) {
                         const idx = i * 3;
@@ -1062,21 +1217,24 @@
                         // Set properties based on type
                         let s, fallSpeed, color;
                         
+                        // base size multiplier from height & maturity
+                        const sizeMult = heightFactor * maturityFactor;
+
                         if (precipType === 'snow') {
-                            s = 1.2 + Math.random() * 2.0;
-                            fallSpeed = 0.15 + (s / 4) * 0.2;
+                            s = (1.2 + Math.random() * 2.0) * sizeMult;
+                            fallSpeed = 0.12 + (s / 4) * 0.12 * Math.min(1.4, heightFactor);
                             color = { r: 1.0, g: 1.0, b: 1.0 };
                         } else if (precipType === 'sleet') {
-                            s = 0.8 + Math.random() * 1.2;
-                            fallSpeed = 0.25 + (s / 3) * 0.4;
+                            s = (0.8 + Math.random() * 1.2) * sizeMult;
+                            fallSpeed = 0.2 + (s / 3) * 0.35 * Math.min(1.4, heightFactor);
                             color = { r: 0.9, g: 0.95, b: 1.0 };
                         } else if (precipType === 'freezing_rain') {
-                            s = 0.7 + Math.random() * 2.0;
-                            fallSpeed = 0.3 + (s / 3) * 0.5;
+                            s = (0.7 + Math.random() * 2.0) * sizeMult;
+                            fallSpeed = 0.25 + (s / 3) * 0.45 * Math.min(1.4, heightFactor);
                             color = { r: 0.8, g: 0.9, b: 1.0 };
                         } else {
-                            s = 0.6 + Math.random() * 2.8;
-                            fallSpeed = 0.35 + (s / 3) * 0.7;
+                            s = (0.6 + Math.random() * 2.8) * sizeMult;
+                            fallSpeed = 0.3 + (s / 3) * 0.6 * Math.min(1.6, heightFactor);
                             color = { r: 0.9, g: 0.95, b: 1.0 };
                         }
                         
@@ -1094,58 +1252,161 @@
             update() {
                 const mature = this.cloudSystemRef.getMature();
                 
-                // Clear previous rainshafts
-                if (this.enableShafts) {
-                    while (this.rainshaftGroup.children.length > 0) {
-                        const child = this.rainshaftGroup.children.pop();
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) child.material.dispose();
-                    }
+                // Stable pooled rainshaft visuals:
+                // don't destroy/create each frame (causes GPU hitching/glitches). Keep a simple pool
+                if (!this._shaftPool) {
+                    this._shaftPool = [];
+                    this._ringPool = [];
+                    this._nextShaft = 0;
+                    this._nextRing = 0;
+                }
+                // toggle visibility quickly when shafts disabled
+                if (!this.enableShafts) {
+                    this.rainshaftGroup.visible = false;
                 } else {
-                    // quickly remove any shafts if disabled
-                    while (this.rainshaftGroup.children.length > 0) this.rainshaftGroup.remove(this.rainshaftGroup.children.pop());
+                    this.rainshaftGroup.visible = true;
                 }
 
                 if (mature.length > 0) {
                     mature.forEach((c, idx) => {
-                        // Complex rainshaft: visual volumetric columns under mature clouds
-                        const intensity = Math.min(1.0, (c.mass / 6) * c.condensationLevel);
-                        const shaftRadius = Math.max(5, c.radius * 0.9);
-                        const shaftHeight = c.height - 0.5;
+                        // Precip intensity scaled by both cloud height and condensation (maturity)
+                        const heightFactor = Math.max(0.9, 1 + (c.height - 12) * 0.05);
+                        const intensity = Math.max(0, Math.min(1.2, (c.mass / 6) * c.condensationLevel * heightFactor));
+                        const shaftRadius = Math.max(5, c.radius * 0.9 * Math.sqrt(1 + c.condensationLevel * 0.6));
+                        const shaftHeight = Math.max(2, c.height - 0.5);
 
-                        if (this.enableShafts && intensity > 0.15 && shaftHeight > 2) {
-                            const shaftGeo = new THREE.CylinderGeometry(
-                                shaftRadius * 0.7,
-                                shaftRadius * 1.1,
-                                shaftHeight,
-                                16,
-                                1,
-                                true
-                            );
-                            const shaftMat = new THREE.MeshBasicMaterial({
-                                color: new THREE.Color(0.55, 0.65, 0.8),
-                                transparent: true,
-                                opacity: 0.3 * intensity,
-                                depthWrite: false,
-                                side: THREE.DoubleSide
+                        // stronger visual shafts for taller/heavier clouds: color shifts and opacity increases
+                        if (this.enableShafts && intensity > 0.12 && shaftHeight > 2) {
+                            
+                            // Check for Virga/Evaporation: Sample humidity near ground (altitude 5)
+                            const env = sampleEnvironment(c.x, c.z, 5);
+                            let baseOffset = 0; // how high above ground the shaft stops
+                            let virgaOpacityFactor = 1.0;
+                            
+                            // Virga effect: If humidity is low, lift the base of the shaft
+                            if (env.humidity < 0.55) {
+                                const dryFactor = 1 - env.humidity / 0.55; // 0 to 1
+                                baseOffset = dryFactor * 10; // Shaft stops 0-10 units above ground
+                                virgaOpacityFactor = 1 - dryFactor * 0.3; // Make it slightly fainter
+                            }
+
+                            // Check for Downburst influence
+                            let downburstInfluence = 0;
+                            let flareRadius = 1.0;
+                            const activeDownburst = AppState.downburstSystem.events.find(ev => {
+                                const dist = Math.sqrt((c.x - ev.x) ** 2 + (c.z - ev.z) ** 2);
+                                // Ensure the cloud is covering the downburst center
+                                return dist < c.radius * 0.7 && ev.life > 10;
                             });
-                            const shaft = new THREE.Mesh(shaftGeo, shaftMat);
-                            shaft.position.set(c.x, shaftHeight * 0.5, c.z);
 
-                            // Tilt shaft slightly with low-level wind for realism
-                            const nearGroundWind = this.windFieldRef.getAt(c.x, 2, c.z);
-                            shaft.rotation.z = nearGroundWind.x * 0.15;
-                            shaft.rotation.x = -nearGroundWind.z * 0.15;
+                            if (activeDownburst) {
+                                // If downburst active, make the base flare out
+                                downburstInfluence = Math.min(1, activeDownburst.strength / 15);
+                                flareRadius = 1.0 + downburstInfluence * 0.6; // 1.0 to 1.6 scale increase at base
+                                baseOffset = 0; // Downburst likely forces rain to ground, overriding virga lift
+                            }
+                            
+                            // Create a simplified pooled volumetric column (one per mature cloud)
+                            // Reuse existing Points (shaft) if available, otherwise create
+                            let shaftObj = this._shaftPool[this._nextShaft++];
+                            if (!shaftObj) {
+                                const pcnt = 160;
+                                const pGeo = new THREE.BufferGeometry();
+                                const pPos = new Float32Array(pcnt * 3);
+                                for (let pi = 0; pi < pcnt; pi++) {
+                                    pPos[pi*3] = 0;
+                                    pPos[pi*3+1] = -1000;
+                                    pPos[pi*3+2] = 0;
+                                }
+                                pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+                                const pMat = new THREE.PointsMaterial({
+                                    size: 0.28,
+                                    color: baseCol,
+                                    transparent: true,
+                                    opacity: Math.min(0.45, 0.25 + intensity * 0.4) * virgaOpacityFactor,
+                                    depthWrite: false,
+                                    blending: THREE.NormalBlending
+                                });
+                                shaftObj = new THREE.Points(pGeo, pMat);
+                                shaftObj.userData = { life: 1.0, baseCol };
+                                this._shaftPool.push(shaftObj);
+                                this.rainshaftGroup.add(shaftObj);
+                            }
+                            // populate positions within a vertical column for this cloud
+                            const pArr = shaftObj.geometry.attributes.position.array;
+                            const pcnt = pArr.length / 3;
+                            for (let pi = 0; pi < pcnt; pi++) {
+                                const layerFrac = Math.random();
+                                const y = layerFrac * shaftHeight * 0.9 + 0.5;
+                                const rrand = Math.random() * shaftRadius * (0.85 + 0.3 * (Math.random()-0.5));
+                                const ang = Math.random() * Math.PI * 2;
+                                pArr[pi*3] = c.x + Math.cos(ang) * rrand + (Math.random()-0.5)*0.06;
+                                pArr[pi*3+1] = y;
+                                pArr[pi*3+2] = c.z + Math.sin(ang) * rrand + (Math.random()-0.5)*0.06;
+                            }
+                            shaftObj.geometry.attributes.position.needsUpdate = true;
+                            shaftObj.position.set(0,0,0);
+                            // fade and slight spread driven by intensity and downburst influence
+                            shaftObj.material.opacity = Math.min(0.7, 0.18 + intensity * 0.5) * virgaOpacityFactor * (1 + downburstInfluence * 0.9);
+                            shaftObj.userData.pulse = intensity * (1 + c.condensationLevel * 0.6);
 
-                            this.rainshaftGroup.add(shaft);
+                            // subtle particle ring near ground to convey outward gust
+                            if (downburstInfluence > 0.05 || baseOffset < 2) { // show ground ring (pooled)
+                                let ring = this._ringPool[this._nextRing++];
+                                if (!ring) {
+                                    const ringGeo = new THREE.RingGeometry(1, 1.4, 28);
+                                    const ringMat = new THREE.MeshBasicMaterial({ color: baseCol, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+                                    ring = new THREE.Mesh(ringGeo, ringMat);
+                                    ring.rotation.x = -Math.PI / 2;
+                                    ring.userData = { pulse: intensity, created: performance.now(), life: 1.0 };
+                                    this._ringPool.push(ring);
+                                    this.rainshaftGroup.add(ring);
+                                }
+                                ring.scale.set(shaftRadius * 0.6, 1, shaftRadius * 0.6);
+                                ring.position.set(c.x, 0.6, c.z);
+                                ring.material.opacity = Math.min(0.5, 0.06 + intensity * 0.22) * (1 + downburstInfluence * 1.8);
+                                ring.userData.created = performance.now();
+                            }
                         }
 
-                        // Particle precipitation intensity tied to cloud properties
-                        const dropCount = 8 + Math.floor(intensity * 30);
+                        // Particle precipitation intensity tied to cloud properties and height
+                        const dropCount = 6 + Math.floor(Math.max(0, intensity) * 40);
                         for (let i = 0; i < dropCount; i++) {
                             this.spawn(c);
                         }
                     });
+                }
+
+                // Animate pooled shafts and rings: gentle breathing and ring fade
+                const now = performance.now();
+                // reset pool indices for reuse next frame
+                this._nextShaft = this._nextShaft || 0;
+                this._nextRing = this._nextRing || 0;
+                // animate shafts
+                for (let si = 0; si < this._shaftPool.length; si++) {
+                    const obj = this._shaftPool[si];
+                    if (!obj) continue;
+                    const pulse = obj.userData.pulse || 0.6;
+                    obj.material.opacity = Math.max(0.02, Math.min(0.9, obj.material.opacity * (0.985 + 0.03 * pulse)));
+                    // slight horizontal drift from low-level wind
+                    const w = this.windFieldRef.getAt(obj.position.x || 0, 2, obj.position.z || 0);
+                    obj.position.x += (w.x || 0) * 0.002 * (0.5 + pulse);
+                    obj.position.z += (w.z || 0) * 0.002 * (0.5 + pulse);
+                }
+                // animate rings and fade them out gradually
+                for (let ri = 0; ri < this._ringPool.length; ri++) {
+                    const ring = this._ringPool[ri];
+                    if (!ring) continue;
+                    const age = (now - (ring.userData.created || now)) * 0.001;
+                    // fade based on elapsed time
+                    ring.material.opacity *= 0.985;
+                    const s = 1 + 0.02 * Math.sin(now * 0.004 + (ring.userData.pulse || 0));
+                    ring.scale.set(ring.scale.x * s, 1, ring.scale.z * s);
+                    // if very faint, shrink to zero to be ignored
+                    if (ring.material.opacity < 0.01) {
+                        ring.material.opacity = 0;
+                        ring.position.set(0, -1000, 0);
+                    }
                 }
 
                 let active = 0;
@@ -1212,7 +1473,7 @@
                 for (let i = streakIdx * 6; i < 200 * 6; i++) {
                     streakPos[i] = 0;
                 }
-                
+
                 this.rain.geometry.attributes.position.needsUpdate = true;
                 this.rain.geometry.attributes.size.needsUpdate = true;
                 this.rain.geometry.attributes.color.needsUpdate = true;
@@ -1389,11 +1650,13 @@
                 this.count++;
                 this.last = performance.now();
                 
-                // Intense camera shake
+                // Intense camera shake: set target offset and duration for positional shake
                 const dist = Math.sqrt(sx * sx + sz * sz);
                 const shakeIntensity = Math.max(0.5, 2 - dist / 80);
-                AppState.cameraControls.shake.intensity = 2 + shakeIntensity * 4;
-                AppState.cameraControls.shake.duration = 0;
+                const s = 1.2 + shakeIntensity * 3.0;
+                AppState.cameraControls.shake.intensity = Math.max(AppState.cameraControls.shake.intensity, s);
+                AppState.cameraControls.shake.duration = 600; // ms
+                AppState.cameraControls.shake.time = 0;
             }
 
             update(t) {
@@ -1436,40 +1699,138 @@
                 this.cloudSystem = cloudSystemRef;
                 this.events = []; // active downbursts
                 this.cooldown = 0;
+                
+                this.group = new THREE.Group();
+                AppState.scene.add(this.group);
             }
 
             // schedule a downburst at (x,z) with strength and radius
             trigger(x, z, strength = 6, radius = 20, duration = 180) {
-                this.events.push({
+                const event = {
                     x, z, strength, radius, life: duration, maxLife: duration,
-                    created: performance.now()
+                    created: performance.now(),
+                    // add vorticity and impulse vectors for richer dynamics
+                    vortexSpin: (Math.random() > 0.5 ? 1 : -1) * (0.6 + Math.random() * 1.4),
+                    coreRadius: Math.max(6, radius * (0.25 + Math.random() * 0.45)),
+                    visuals: new THREE.Group() // Group for associated meshes/particles
+                };
+                
+                // --- Downburst Foot / Outflow Visualization ---
+                
+                // 1. Ground splash (expanding particle ring for dust/mist)
+                const splashParticles = this.createSplashParticles(event);
+                event.visuals.add(splashParticles);
+                
+                // 2. Persistent outflow boundary (ring geometry that fades)
+                const ringGeo = new THREE.RingGeometry(event.coreRadius * 0.8, event.radius * 0.9, 32);
+                const baseCol = new THREE.Color(0xc8d0e0);
+                const ringMat = new THREE.MeshBasicMaterial({ 
+                    color: baseCol, 
+                    transparent: true, 
+                    opacity: 0.15 * (strength / 10), 
+                    side: THREE.DoubleSide, 
+                    depthWrite: false, 
+                    blending: THREE.AdditiveBlending 
                 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = -Math.PI / 2;
+                ring.position.set(0, 0.4, 0); // relative to event.visuals group
+                ring.userData.maxScale = 3 + strength * 0.3;
+                ring.userData.type = 'outflow_ring';
+                event.visuals.add(ring);
+                
+                event.visuals.position.set(x, 0, z);
+                this.group.add(event.visuals);
+
+                this.events.push(event);
+            }
+
+            createSplashParticles(event) {
+                const particleCount = 200;
+                const pGeo = new THREE.BufferGeometry();
+                const pPos = new Float32Array(particleCount * 3);
+                const pVel = new Float32Array(particleCount * 3);
+                const pLife = new Float32Array(particleCount);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random() * event.radius * 0.6;
+                    
+                    pPos[i*3] = Math.cos(angle) * r;
+                    pPos[i*3+1] = 0.5;
+                    pPos[i*3+2] = Math.sin(angle) * r;
+                    
+                    pVel[i*3] = Math.cos(angle) * (1 + Math.random() * event.strength * 0.1);
+                    pVel[i*3+1] = 0.2 + Math.random() * 0.8; // upward kick
+                    pVel[i*3+2] = Math.sin(angle) * (1 + Math.random() * event.strength * 0.1);
+                    
+                    pLife[i] = 1.0;
+                }
+                
+                pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+                pGeo.setAttribute('velocity', new THREE.BufferAttribute(pVel, 3));
+                pGeo.setAttribute('life', new THREE.BufferAttribute(pLife, 1));
+                
+                const pMat = new THREE.PointsMaterial({
+                    size: 0.8 + event.strength * 0.05,
+                    color: 0xc8d0e0, // dusty light grey/blue
+                    transparent: true,
+                    opacity: 0.8,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    sizeAttenuation: true
+                });
+                
+                const points = new THREE.Points(pGeo, pMat);
+                points.userData = { 
+                    type: 'splash_particles', 
+                    strength: event.strength, 
+                    maxLife: event.maxLife 
+                };
+                return points;
             }
 
             // inject a transient perturbation into the wind field for low levels
             applyToWind(event) {
-                // affect a subset of windField cells near ground (gy = 0..3)
+                // affect a subset of windField cells near ground (gy = 0..4)
                 const s = event.strength;
                 const r = event.radius;
                 const size = this.windField.size;
                 const spacing = this.windField.spacing;
+                const now = performance.now();
 
                 for (let gx = 0; gx < size; gx++) {
-                    for (let gy = 0; gy < Math.min(4, size); gy++) {
+                    for (let gy = 0; gy < Math.min(6, size); gy++) {
                         for (let gz = 0; gz < size; gz++) {
                             const wx = (gx - size / 2) * spacing;
                             const wz = (gz - size / 2) * spacing;
-                            const dist = Math.sqrt((wx - event.x) ** 2 + (wz - event.z) ** 2);
+                            const dx = wx - event.x;
+                            const dz = wz - event.z;
+                            const dist = Math.sqrt(dx * dx + dz * dz);
                             if (dist < r) {
-                                const factor = 1 - dist / r;
-                                // downward gust: negative y component stored in extra prop; we convert to horizontal push outward
-                                const push = s * factor * (event.life / event.maxLife);
-                                // radial outward horizontal vector
-                                const dx = (wx - event.x) / (dist + 0.0001);
-                                const dz = (wz - event.z) / (dist + 0.0001);
-                                // apply as a temporary additive perturbation to the cell
-                                this.windField.field[gx][gy][gz].x += dx * push * 0.5;
-                                this.windField.field[gx][gy][gz].z += dz * push * 0.5;
+                                const radialFactor = 1 - dist / r;
+                                const lifeFactor = Math.max(0.08, event.life / event.maxLife);
+                                // outward radial push stronger near start, weaker at edges
+                                const radialPush = s * radialFactor * lifeFactor * (1 + (4 - gy) * 0.18);
+                                // add rotational (vortex) component, stronger near coreRadius
+                                const vortexInfluence = Math.max(0, 1 - dist / Math.max(1, event.coreRadius));
+                                const spin = event.vortexSpin * 0.9 * vortexInfluence * lifeFactor * (1 + (4 - gy) * 0.08);
+                                // compute unit radial and tangential vectors
+                                const inv = 1 / (dist + 0.0001);
+                                const ux = dx * inv;
+                                const uz = dz * inv;
+                                // tangential perpendicular vector
+                                const tx = -uz;
+                                const tz = ux;
+                                // apply combined radial + tangential perturbation
+                                this.windField.field[gx][gy][gz].x += ux * radialPush * 0.6 + tx * spin * 0.8;
+                                this.windField.field[gx][gy][gz].z += uz * radialPush * 0.6 + tz * spin * 0.8;
+                                // add a small downward signal stored in cell for precipitation/visuals to read
+                                if (!this.windField.field[gx][gy][gz].__downburst) this.windField.field[gx][gy][gz].__downburst = 0;
+                                this.windField.field[gx][gy][gz].__downburst += radialPush * 0.06 * (1 + (5 - gy) * 0.06);
+                                // also inject a short-lived vorticity marker
+                                if (!this.windField.field[gx][gy][gz].__vortex) this.windField.field[gx][gy][gz].__vortex = 0;
+                                this.windField.field[gx][gy][gz].__vortex += Math.sign(event.vortexSpin) * vortexInfluence * lifeFactor * 0.02;
                             }
                         }
                     }
@@ -1485,40 +1846,105 @@
                 const mature = this.cloudSystem.getMature();
                 mature.forEach(c => {
                     // high mass and sudden age spike can cause collapse -> downburst chance
-                    if (c.mass > 6 && Math.random() < 0.0009 && this.cooldown === 0) {
-                        const x = c.x + (Math.random() - 0.5) * 6;
-                        const z = c.z + (Math.random() - 0.5) * 6;
-                        const strength = 6 + Math.random() * 6;
-                        const radius = Math.max(12, c.radius * 0.9 + Math.random() * 8);
-                        const dur = 120 + Math.floor(Math.random() * 120);
+                    if (c.mass > 6 && Math.random() < 0.0012 && this.cooldown === 0) {
+                        const x = c.x + (Math.random() - 0.5) * 8;
+                        const z = c.z + (Math.random() - 0.5) * 8;
+                        const strength = 6 + Math.random() * 10;
+                        const radius = Math.max(12, c.radius * 1.0 + Math.random() * 18);
+                        const dur = 100 + Math.floor(Math.random() * 220);
                         this.trigger(x, z, strength, radius, dur);
-                        this.cooldown = 600 + Math.floor(Math.random() * 400);
-                        // camera shake for dramatic effect
-                        AppState.cameraControls.shake.intensity = Math.max(AppState.cameraControls.shake.intensity, 1.8);
+                        this.cooldown = 700 + Math.floor(Math.random() * 400);
+                        // stronger camera shake for larger downbursts
+                        AppState.cameraControls.shake.intensity = Math.max(AppState.cameraControls.shake.intensity, 0.9 + strength * 0.18);
                     }
                 });
 
                 // apply active events to wind field and age them
                 for (let i = this.events.length - 1; i >= 0; i--) {
                     const ev = this.events[i];
-                    // stronger effect at start
+                    
+                    // --- Visual Update ---
+                    const progress = ev.life / ev.maxLife;
+                    ev.visuals.traverse(obj => {
+                        if (obj.userData.type === 'outflow_ring' && obj.material) {
+                            const scale = 1 + (ev.maxLife - ev.life) * (obj.userData.maxScale || 3) / ev.maxLife;
+                            obj.scale.set(scale, scale, scale);
+                            // Initial heavy opacity, fading quickly
+                            obj.material.opacity = Math.max(0.01, (progress * 0.8 + 0.2) * (ev.strength / 10) * 0.15);
+                        } else if (obj.userData.type === 'splash_particles' && obj.geometry) {
+                            const positions = obj.geometry.attributes.position.array;
+                            const velocities = obj.geometry.attributes.velocity.array;
+                            const lives = obj.geometry.attributes.life.array;
+                            let allDead = true;
+                            
+                            for (let j = 0; j < positions.length / 3; j++) {
+                                if (lives[j] > 0) {
+                                    positions[j*3] += velocities[j*3] * 0.01;
+                                    positions[j*3+1] += velocities[j*3+1] * 0.01;
+                                    positions[j*3+2] += velocities[j*3+2] * 0.01;
+                                    // Gravity/air resistance
+                                    velocities[j*3+1] -= 0.05 * 0.01;
+                                    
+                                    lives[j] -= 0.005;
+                                    
+                                    if (positions[j*3+1] < 0.5) lives[j] = 0; // hit ground
+                                    
+                                    if (lives[j] > 0) allDead = false;
+                                    
+                                    // Fade based on particle life
+                                    obj.material.opacity = Math.min(0.8, progress) * (lives[j] / 1.0) * 0.8; 
+                                } else {
+                                    // hide dead particle
+                                    positions[j*3+1] = -1000;
+                                }
+                            }
+                            obj.geometry.attributes.position.needsUpdate = true;
+                            // If main event is dying, ensure particles fade and die out
+                            if (ev.life < 10 && allDead) {
+                                ev.life = 0;
+                            }
+                        }
+                    });
+
+                    // apply multiple passes per frame to create a broad transient gust and an inner core collapse
                     this.applyToWind(ev);
-                    ev.life--;
-                    // visual subtle ground flash: small point light for a moment when starting
+                    // inner core pulse that decays faster
+                    if (ev.life > ev.maxLife * 0.6) {
+                        // create a strong inner core impulse for the first part
+                        const corePulse = {
+                            x: ev.x + (Math.random() - 0.5) * (ev.coreRadius * 0.2),
+                            z: ev.z + (Math.random() - 0.5) * (ev.coreRadius * 0.2),
+                            strength: ev.strength * 0.6,
+                            radius: Math.max(4, ev.coreRadius * 0.8),
+                            life: 6,
+                            maxLife: 6,
+                            vortexSpin: ev.vortexSpin * (0.6 + Math.random() * 0.6)
+                        };
+                        this.applyToWind(corePulse);
+                    }
+                    // visual subtle ground flash at creation
                     if (ev.life === ev.maxLife - 1) {
-                        const flash = new THREE.PointLight(0xaad6ff, 0.8, ev.radius * 1.6);
+                        const flash = new THREE.PointLight(0xaad6ff, 0.9, ev.radius * 1.6);
                         flash.position.set(ev.x, 8, ev.z);
                         AppState.scene.add(flash);
-                        // fade the flash quickly
                         setTimeout(() => {
-                            flash.intensity = 0.2;
+                            flash.intensity = 0.25;
                             setTimeout(() => {
                                 AppState.scene.remove(flash);
                                 if (flash.dispose) flash.dispose();
                             }, 300);
-                        }, 120);
+                        }, 80);
                     }
-                    if (ev.life <= 0) this.events.splice(i, 1);
+                    ev.life--;
+                    if (ev.life <= 0) {
+                        // Dispose visuals
+                        ev.visuals.traverse(obj => {
+                            if (obj.geometry) obj.geometry.dispose();
+                            if (obj.material) obj.material.dispose();
+                        });
+                        this.group.remove(ev.visuals);
+                        this.events.splice(i, 1);
+                    }
                 }
             }
         }
@@ -1528,83 +1954,78 @@
             AppState.renderer.domElement.addEventListener('mousedown', e => {
                 AppState.cameraControls.isDrag = true;
                 AppState.cameraControls.prevMouse = { x: e.clientX, y: e.clientY };
+                // enable pointer lock suggestion for FP mode on click (optional)
+                if (AppState.firstPerson && document.body.requestPointerLock) {
+                    try { document.body.requestPointerLock(); } catch(e){}
+                }
             });
 
+            // Single canonical mousemove drag handler (orbit)
             AppState.renderer.domElement.addEventListener('mousemove', e => {
                 if (!AppState.cameraControls.isDrag) return;
                 const dx = e.clientX - AppState.cameraControls.prevMouse.x;
                 const dy = e.clientY - AppState.cameraControls.prevMouse.y;
-                AppState.cameraControls.rotation.theta -= dx * 0.005;
-                AppState.cameraControls.rotation.phi -= dy * 0.005;
-                AppState.cameraControls.rotation.phi = Math.max(0.1, Math.min(Math.PI / 2.2, AppState.cameraControls.rotation.phi));
+                AppState.cameraControls.rotation.theta -= dx * 0.03;
+                AppState.cameraControls.rotation.phi -= dy * 0.02;
+                AppState.cameraControls.rotation.phi = Math.max(0.08, Math.min(Math.PI / 2.2, AppState.cameraControls.rotation.phi));
                 AppState.cameraControls.prevMouse = { x: e.clientX, y: e.clientY };
             });
 
             AppState.renderer.domElement.addEventListener('mouseup', () => {
                 AppState.cameraControls.isDrag = false;
+                if (document.exitPointerLock) try { document.exitPointerLock(); } catch(e){}
             });
 
-            AppState.renderer.domElement.addEventListener('wheel', e => {
-                e.preventDefault();
-                AppState.cameraControls.distance = Math.max(35, Math.min(150, AppState.cameraControls.distance + e.deltaY * 0.08));
-            }, { passive: false });
-
-            // Touch controls
-            let touchStartPos = null;
-            let touchStartDist = null;
-
+            // Touch controls (orbit/look handled via joystick below)
             AppState.renderer.domElement.addEventListener('touchstart', e => {
-                if (e.touches.length === 1) {
-                    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                } else if (e.touches.length === 2) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    touchStartDist = Math.sqrt(dx * dx + dy * dy);
-                }
+                // prevent default handled per listeners when needed
             });
 
-            AppState.renderer.domElement.addEventListener('touchmove', e => {
-                e.preventDefault();
-                
-                if (e.touches.length === 1 && touchStartPos) {
-                    const dx = e.touches[0].clientX - touchStartPos.x;
-                    const dy = e.touches[0].clientY - touchStartPos.y;
-                    AppState.cameraControls.rotation.theta -= dx * 0.005;
-                    AppState.cameraControls.rotation.phi -= dy * 0.005;
-                    AppState.cameraControls.rotation.phi = Math.max(0.1, Math.min(Math.PI / 2.2, AppState.cameraControls.rotation.phi));
-                    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                } else if (e.touches.length === 2 && touchStartDist) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const delta = touchStartDist - dist;
-                    AppState.cameraControls.distance = Math.max(35, Math.min(150, AppState.cameraControls.distance + delta * 0.5));
-                    touchStartDist = dist;
-                }
-            }, { passive: false });
+            // Keyboard controls for FPS movement and GUI
+            const keys = {};
+            window.addEventListener('keydown', e => {
+                keys[e.key.toLowerCase()] = true;
 
-            AppState.renderer.domElement.addEventListener('touchend', () => {
-                touchStartPos = null;
-                touchStartDist = null;
-            });
-
-            // Keyboard controls
-            window.addEventListener('keypress', e => {
+                // toggle GUI with H
                 if (e.key === 'h' || e.key === 'H') {
                     AppState.showGui = !AppState.showGui;
-                    // hide/show UI panels (keep the toggle button and pause button visible)
+                    document.body.classList.toggle('ui-collapsed', !AppState.showGui);
                     ['stats', 'controls', 'info', 'graphics'].forEach(id => {
                         const el = document.getElementById(id);
-                        if (el) el.classList.toggle('hidden', !AppState.showGui);
+                        if (el) el.setAttribute('aria-hidden', String(!AppState.showGui));
                     });
-                    // update toggle button text (but do NOT hide the toggle button itself)
-                    document.getElementById('toggle-gui').textContent = AppState.showGui ? '👁️ Hide GUI' : '👁️ Show GUI';
+                    document.getElementById('toggle-gui').textContent = AppState.showGui ? '👁️ Hide UI' : '👁️ Show UI';
                 }
             });
+            window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
+            // WASD movement loop integrated into animation (values persisted) — orbit only (no FP movement)
+            function updateKeyboardMovement() {
+                const ctrl = AppState.cameraControls;
+                ctrl.move.forward = 0;
+                ctrl.move.right = 0;
+                let speed = ctrl.speed;
+                if (keys['shift']) speed *= ctrl.runMultiplier;
+                if (keys['w']) ctrl.move.forward += 1;
+                if (keys['s']) ctrl.move.forward -= 1;
+                if (keys['a']) ctrl.move.right -= 1;
+                if (keys['d']) ctrl.move.right += 1;
+                // No first-person movement — WASD inert in orbit view (can be repurposed later)
+                requestAnimationFrame(updateKeyboardMovement);
+            }
+            updateKeyboardMovement();
+
+            // toggle GUI via button dispatch (keeps semantics)
+            // direct GUI toggle so it's reliable across environments
             document.getElementById('toggle-gui').addEventListener('click', () => {
-                const e = new KeyboardEvent('keypress', { key: 'h' });
-                window.dispatchEvent(e);
+                AppState.showGui = !AppState.showGui;
+                document.body.classList.toggle('ui-collapsed', !AppState.showGui);
+                ['stats', 'controls', 'info', 'graphics'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.setAttribute('aria-hidden', String(!AppState.showGui));
+                    if (el) el.classList.toggle('hidden', !AppState.showGui);
+                });
+                document.getElementById('toggle-gui').textContent = AppState.showGui ? '👁️ Hide UI' : '👁️ Show UI';
             });
 
             // Pause button
@@ -1614,44 +2035,41 @@
                 pauseBtn.textContent = AppState.paused ? '▶ Resume' : '⏸ Pause';
             });
 
-            // Graphics UI bindings
-            const shadowToggle = document.getElementById('shadow-toggle');
-            const rainToggle = document.getElementById('rainshaft-toggle');
-            const lightningToggle = document.getElementById('lightning-toggle');
-            const particleRange = document.getElementById('particle-range');
-            const cloudRange = document.getElementById('cloud-range');
-            const pxRange = document.getElementById('px-range');
+            // make Controls panel closable: add close button to controls panel (kept but now only hides controls panel)
+            (function addControlsClose() {
+                const controlsEl = document.getElementById('controls');
+                if (!controlsEl) return;
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = '✕';
+                closeBtn.title = 'Close';
+                closeBtn.style.position = 'absolute';
+                closeBtn.style.top = '8px';
+                closeBtn.style.right = '8px';
+                closeBtn.style.width = '30px';
+                closeBtn.style.height = '30px';
+                closeBtn.style.borderRadius = '6px';
+                closeBtn.style.border = '1px solid rgba(255,255,255,0.08)';
+                closeBtn.style.background = 'rgba(0,0,0,0.5)';
+                closeBtn.style.color = 'white';
+                closeBtn.style.cursor = 'pointer';
+                controlsEl.appendChild(closeBtn);
 
-            shadowToggle.addEventListener('change', e => {
-                Graphics.shadows = e.target.checked;
-                applyGraphicsSettings();
-            });
-            rainToggle.addEventListener('change', e => {
-                Graphics.rainshafts = e.target.checked;
-                applyGraphicsSettings();
-            });
-            lightningToggle.addEventListener('change', e => {
-                Graphics.lightning = e.target.checked;
-                applyGraphicsSettings();
-            });
-            particleRange.addEventListener('input', e => {
-                Graphics.particleDetail = Number(e.target.value);
-                applyGraphicsSettings();
-            });
-            cloudRange.addEventListener('input', e => {
-                Graphics.cloudDetail = Number(e.target.value);
-                applyGraphicsSettings();
-            });
-            pxRange.addEventListener('input', e => {
-                Graphics.pixelRatio = Number(e.target.value);
-                applyGraphicsSettings();
-            });
-
-            window.addEventListener('resize', () => {
-                AppState.camera.aspect = window.innerWidth / window.innerHeight;
-                AppState.camera.updateProjectionMatrix();
-                AppState.renderer.setSize(window.innerWidth, window.innerHeight);
-            });
+                // toggle via close button (hide) and add a small reopen button
+                closeBtn.addEventListener('click', () => {
+                    controlsEl.classList.add('hidden');
+                    // create reopen button if not present
+                    if (!document.getElementById('reopen-controls')) {
+                        const btn = document.createElement('button');
+                        btn.id = 'reopen-controls';
+                        btn.textContent = 'Controls';
+                        document.body.appendChild(btn);
+                        btn.addEventListener('click', () => {
+                            controlsEl.classList.remove('hidden');
+                            btn.remove();
+                        });
+                    }
+                });
+            })();
         }
 
         function init() {
@@ -1693,6 +2111,31 @@
             AppState.downburstSystem = new Downburst(AppState.windField, AppState.cloudSystem);
             
             setupControls();
+            // detect CPU & GPU and display
+            (function detectHardware() {
+                try {
+                    const cpuEl = document.getElementById('cpu');
+                    const gpuEl = document.getElementById('gpu');
+                    // CPU cores
+                    const cores = navigator.hardwareConcurrency || '—';
+                    if (cpuEl) cpuEl.textContent = cores;
+                    // GPU via WebGL debug renderer info
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    let renderer = 'Unknown';
+                    if (gl) {
+                        const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                        if (dbg) {
+                            renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || renderer;
+                        } else {
+                            renderer = gl.getParameter(gl.RENDERER) || renderer;
+                        }
+                    }
+                    if (gpuEl) gpuEl.textContent = renderer;
+                } catch (e) {
+                    console.warn('Hardware detect failed', e);
+                }
+            })();
         }
 
         let frames = 0;
@@ -1718,23 +2161,65 @@
             const activePart = AppState.rainSystem.update();
             AppState.lightningSystem.update(t);
 
-            // small camera shake decay handling
+            // Positional camera shake handling (shake applied to lookAt target)
             const shake = AppState.cameraControls.shake;
-            if (shake.intensity > 0.01) {
-                const s = shake.intensity;
-                AppState.camera.position.x += (Math.random() - 0.5) * s;
-                AppState.camera.position.y += (Math.random() - 0.5) * s * 0.6;
-                AppState.camera.position.z += (Math.random() - 0.5) * s;
-                shake.intensity *= 0.92;
-            } else {
-                shake.intensity = 0;
-            }
-
             const ctrl = AppState.cameraControls;
-            AppState.camera.position.x = ctrl.distance * Math.sin(ctrl.rotation.theta) * Math.cos(ctrl.rotation.phi);
-            AppState.camera.position.y = ctrl.distance * Math.sin(ctrl.rotation.phi);
-            AppState.camera.position.z = ctrl.distance * Math.cos(ctrl.rotation.theta) * Math.cos(ctrl.rotation.phi);
-            AppState.camera.lookAt(0, 20, 0);
+
+            // base camera placement (spherical around center) or FP
+            if (!AppState.firstPerson) {
+                AppState.camera.position.x = ctrl.distance * Math.sin(ctrl.rotation.theta) * Math.cos(ctrl.rotation.phi);
+                AppState.camera.position.y = ctrl.distance * Math.sin(ctrl.rotation.phi);
+                AppState.camera.position.z = ctrl.distance * Math.cos(ctrl.rotation.theta) * Math.cos(ctrl.rotation.phi);
+
+                // final lookAt with positional offset (positional shake)
+                const baseTarget = { x: 0, y: 20, z: 0 };
+                let targetOffset = { x: 0, y: 0, z: 0 };
+                if (shake.intensity > 0.001 && (shake.duration > 0 || shake.time < shake.duration)) {
+                    shake.time += Math.min(1000 / 60, 16.66);
+                    const progress = Math.min(1, shake.time / Math.max(1, shake.duration));
+                    const decay = 1 - progress;
+                    const freq = shake.frequency || 18;
+                    targetOffset.x = (Math.sin(t * 0.001 * freq) * 0.6 + (Math.random() - 0.5) * 1.0) * shake.intensity * 0.12 * decay;
+                    targetOffset.y = (Math.cos(t * 0.001 * freq * 0.6) * 0.4 + (Math.random() - 0.5) * 0.6) * shake.intensity * 0.06 * decay;
+                    targetOffset.z = (Math.cos(t * 0.001 * freq * 1.1) * 0.6 + (Math.random() - 0.5) * 1.0) * shake.intensity * 0.12 * decay;
+                    shake.intensity *= 0.94;
+                    if (shake.time >= shake.duration || shake.intensity < 0.03) {
+                        shake.intensity = 0;
+                        shake.duration = 0;
+                        shake.time = 0;
+                    }
+                }
+                AppState.camera.lookAt(baseTarget.x + targetOffset.x, baseTarget.y + targetOffset.y, baseTarget.z + targetOffset.z);
+            } else {
+                // First-person view: yaw/pitch applied directly
+                // Keep camera at its current position (moved by movement joystick / WASD). Rotate target based on yaw/pitch for look vector.
+                const yaw = ctrl.rotation.yaw || 0;
+                const pitch = ctrl.rotation.pitch || 0;
+                // compute forward target
+                const look = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+                const targetPos = new THREE.Vector3().copy(AppState.camera.position).add(look);
+                // apply small positional shake to camera position if present
+                if (shake.intensity > 0.001 && (shake.duration > 0 || shake.time < shake.duration)) {
+                    shake.time += Math.min(1000 / 60, 16.66);
+                    const progress = Math.min(1, shake.time / Math.max(1, shake.duration));
+                    const decay = 1 - progress;
+                    const freq = shake.frequency || 18;
+                    const offset = new THREE.Vector3(
+                        (Math.sin(t * 0.001 * freq) * 0.6 + (Math.random() - 0.5) * 1.0) * shake.intensity * 0.06 * decay,
+                        (Math.cos(t * 0.001 * freq * 0.6) * 0.4 + (Math.random() - 0.5) * 0.6) * shake.intensity * 0.03 * decay,
+                        (Math.cos(t * 0.001 * freq * 1.1) * 0.6 + (Math.random() - 0.5) * 1.0) * shake.intensity * 0.06 * decay
+                    );
+                    AppState.camera.position.add(offset);
+                    targetPos.add(offset);
+                    shake.intensity *= 0.94;
+                    if (shake.time >= shake.duration || shake.intensity < 0.03) {
+                        shake.intensity = 0;
+                        shake.duration = 0;
+                        shake.time = 0;
+                    }
+                }
+                AppState.camera.lookAt(targetPos);
+            }
 
             AppState.renderer.render(AppState.scene, AppState.camera);
 
@@ -1746,6 +2231,13 @@
                 document.getElementById('charge').textContent = Math.floor(AppState.lightningSystem.charge);
                 document.getElementById('strikes').textContent = AppState.lightningSystem.count;
                 document.getElementById('wind').textContent = windSpeed.toFixed(1);
+                // update hardware readout occasionally
+                try {
+                    const cpuEl = document.getElementById('cpu');
+                    const gpuEl = document.getElementById('gpu');
+                    if (cpuEl && cpuEl.textContent === '—') cpuEl.textContent = (navigator.hardwareConcurrency || '—');
+                    // GPU is set at init; no frequent update needed
+                } catch (e) {}
                 frames = 0;
                 lastFps = t;
             }
@@ -1780,6 +2272,10 @@
             if (AppState.cloudSystem) {
                 const newMaxClouds = Math.max(10, Math.min(200, Math.floor(Graphics.cloudDetail)));
                 AppState.cloudSystem.max = newMaxClouds;
+                // expose volumetric settings to cloud system for immediate effect
+                AppState.cloudSystem.volumetricEnabled = !!Graphics.volumetric;
+                AppState.cloudSystem.volumetricDensity = Number(Graphics.volumetricDensity);
+                AppState.cloudSystem.volumetricResolution = Number(Graphics.volumetricResolution);
                 // if there are too many clouds right now, prune oldest/dying ones
                 if (AppState.cloudSystem.clouds.length > newMaxClouds) {
                     const excess = AppState.cloudSystem.clouds.length - newMaxClouds;
@@ -1790,15 +2286,33 @@
                         if (c && c.grp) {
                             // dispose meshes inside group
                             c.puffs.forEach(p => {
-                                if (p) {
-                                    if (p.geometry) p.geometry.dispose();
-                                    if (p.material) p.material.dispose();
-                                }
+                                if (!p) return;
+                                if (p.geometry) p.geometry.dispose();
+                                if (p.material) p.material.dispose();
                             });
                             AppState.cloudSystem.group.remove(c.grp);
                         }
                     }
                 }
+            }
+            // ensure cloud system is aware of render mode and volumetric toggles
+            if (AppState.cloudSystem) {
+                AppState.cloudSystem.renderMode = Graphics.cloudRenderMode;
+                AppState.cloudSystem.volumetricEnabled = !!Graphics.volumetric;
+                AppState.cloudSystem.volumetricDensity = Number(Graphics.volumetricDensity);
+                AppState.cloudSystem.volumetricResolution = Number(Graphics.volumetricResolution);
+
+                // rebuild existing cloud puffs to apply new render mode immediately
+                AppState.cloudSystem.clouds.forEach(c => {
+                    if (!c || !c.grp || !c.puffs) return;
+                    c.puffs.forEach(p => {
+                        if (!p) return;
+                        c.grp.remove(p);
+                        if (p.geometry) p.geometry.dispose();
+                        if (p.material) p.material.dispose();
+                    });
+                    c.puffs = [];
+                });
             }
             // pixel ratio
             if (AppState.renderer) {
@@ -1810,6 +2324,226 @@
 
         init();
         animate();
+
+        // wire graphics UI controls to Graphics object and apply settings
+        (function setupGraphicsUI() {
+            const shadowToggle = document.getElementById('shadow-toggle');
+            const rainshaftToggle = document.getElementById('rainshaft-toggle');
+            const lightningToggle = document.getElementById('lightning-toggle');
+            const particleRange = document.getElementById('particle-range');
+            const cloudRange = document.getElementById('cloud-range');
+            const pxRange = document.getElementById('px-range');
+            const cloudModeSelect = document.getElementById('cloud-mode');
+
+            if (shadowToggle) {
+                shadowToggle.addEventListener('change', () => {
+                    Graphics.shadows = shadowToggle.checked;
+                    applyGraphicsSettings();
+                });
+            }
+            if (rainshaftToggle) {
+                rainshaftToggle.addEventListener('change', () => {
+                    Graphics.rainshafts = rainshaftToggle.checked;
+                    applyGraphicsSettings();
+                });
+            }
+            if (lightningToggle) {
+                lightningToggle.addEventListener('change', () => {
+                    Graphics.lightning = lightningToggle.checked;
+                    applyGraphicsSettings();
+                });
+            }
+            if (particleRange) {
+                particleRange.addEventListener('input', () => {
+                    Graphics.particleDetail = Number(particleRange.value);
+                    applyGraphicsSettings();
+                });
+            }
+            if (cloudRange) {
+                cloudRange.addEventListener('input', () => {
+                    Graphics.cloudDetail = Number(cloudRange.value);
+                    applyGraphicsSettings();
+                });
+            }
+            if (pxRange) {
+                pxRange.addEventListener('input', () => {
+                    Graphics.pixelRatio = Number(pxRange.value);
+                    applyGraphicsSettings();
+                });
+            }
+            if (cloudModeSelect) {
+                cloudModeSelect.addEventListener('change', () => {
+                    Graphics.cloudRenderMode = cloudModeSelect.value === 'particles' ? 'particles' : 'volumetric';
+                    applyGraphicsSettings();
+                });
+            }
+
+            // initialize from current UI values
+            if (shadowToggle) Graphics.shadows = shadowToggle.checked;
+            if (rainshaftToggle) Graphics.rainshafts = rainshaftToggle.checked;
+            if (lightningToggle) Graphics.lightning = lightningToggle.checked;
+            if (particleRange) Graphics.particleDetail = Number(particleRange.value);
+            if (cloudRange) Graphics.cloudDetail = Number(cloudRange.value);
+            if (pxRange) Graphics.pixelRatio = Number(pxRange.value);
+            if (cloudModeSelect) Graphics.cloudRenderMode = cloudModeSelect.value === 'particles' ? 'particles' : 'volumetric';
+
+            applyGraphicsSettings();
+        })();
+
+        // Mobile joystick using nipplejs (esm.sh) - left = movement, right = look
+        (async () => {
+            try {
+                const { default: nipplejs } = await import('https://esm.sh/nipplejs@0.9.0');
+                // create invisible zones for two joysticks
+                const moveZone = document.createElement('div');
+                moveZone.id = 'joy-move';
+                moveZone.className = 'joy-zone';
+                document.body.appendChild(moveZone);
+
+                const lookZone = document.createElement('div');
+                lookZone.id = 'joy-look';
+                lookZone.className = 'joy-zone';
+                document.body.appendChild(lookZone);
+
+                const mgrMove = nipplejs.create({ zone: moveZone, mode: 'static', position: { left: '60px', top: '60px' }, color: '#6cf' });
+                const mgrLook = nipplejs.create({ zone: lookZone, mode: 'static', position: { right: '60px', top: '60px' }, color: '#6cf' });
+
+                // Movement joystick: controls forward/back and strafing
+                let moveActive = false;
+                mgrMove.on('start', () => moveActive = true);
+                mgrMove.on('end', () => {
+                    moveActive = false;
+                    AppState.cameraControls.move.forward = 0;
+                    AppState.cameraControls.move.right = 0;
+                });
+                mgrMove.on('move', (evt, data) => {
+                    if (!moveActive || !data) return;
+                    const force = data.force || 0;
+                    const angle = data.angle && data.angle.radian !== undefined ? data.angle.radian : 0;
+                    // project joystick vector to forward/right in FP orientation
+                    const vx = Math.cos(angle) * force;
+                    const vy = Math.sin(angle) * force;
+                    // map to forward and right axes (invert y so up = forward)
+                    AppState.cameraControls.move.forward = -vy * 1.4;
+                    AppState.cameraControls.move.right = vx * 1.4;
+                });
+
+                // Look joystick: controls yaw/pitch when in FP or orbit rotation otherwise
+                let lookActive = false;
+                mgrLook.on('start', () => lookActive = true);
+                mgrLook.on('end', () => lookActive = false);
+                mgrLook.on('move', (evt, data) => {
+                    if (!lookActive || !data) return;
+                    const vx = data.vector.x || 0;
+                    const vy = data.vector.y || 0;
+                    if (AppState.firstPerson) {
+                        AppState.cameraControls.rotation.yaw -= vx * 0.06;
+                        AppState.cameraControls.rotation.pitch -= vy * 0.05;
+                        AppState.cameraControls.rotation.pitch = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, AppState.cameraControls.rotation.pitch));
+                    } else {
+                        AppState.cameraControls.rotation.theta -= vx * 0.03;
+                        AppState.cameraControls.rotation.phi -= vy * 0.02;
+                        AppState.cameraControls.rotation.phi = Math.max(0.08, Math.min(Math.PI / 2.2, AppState.cameraControls.rotation.phi));
+                    }
+                    // optional zoom with pushing look joystick forward/back
+                    if (data.distance) {
+                        AppState.cameraControls.distance = Math.max(20, Math.min(AppState.cameraControls.maxDistance || 300, AppState.cameraControls.distance + vy * 0.8));
+                    }
+                });
+            } catch (err) {
+                console.warn('Joystick failed to load:', err);
+            }
+        })();
+
+        // FP toggle wiring
+        (function setupFPToggle() {
+            const btn = document.getElementById('fp-toggle');
+            function setFP(enabled) {
+                AppState.firstPerson = !!enabled;
+                btn.classList.toggle('active', AppState.firstPerson);
+                btn.textContent = AppState.firstPerson ? 'FP Mode: ON' : 'FP Mode';
+                // when switching to FP, position camera to a reasonable height if far out
+                if (AppState.firstPerson) {
+                    // move camera to ground-level viewpoint preserving current orbit focus direction
+                    const theta = AppState.cameraControls.rotation.theta || 0;
+                    const phi = AppState.cameraControls.rotation.phi || 0;
+                    AppState.cameraControls.rotation.yaw = theta;
+                    AppState.cameraControls.rotation.pitch = (phi - Math.PI/2) * -1 * 0.9; // convert orbit pitch to FP pitch approx
+                    // place camera near terrain height 1.6 * scale
+                    AppState.camera.position.set(0, 2.0, 0);
+                } else {
+                    // move back to orbit camera default distance
+                    AppState.cameraControls.rotation.theta = AppState.cameraControls.rotation.yaw || 0;
+                    AppState.cameraControls.rotation.phi = Math.max(0.12, Math.min(Math.PI / 2.2, Math.PI/2 - (AppState.cameraControls.rotation.pitch || 0)));
+                    AppState.camera.position.set(
+                        AppState.cameraControls.distance * Math.sin(AppState.cameraControls.rotation.theta) * Math.cos(AppState.cameraControls.rotation.phi),
+                        AppState.cameraControls.distance * Math.sin(AppState.cameraControls.rotation.phi),
+                        AppState.cameraControls.distance * Math.cos(AppState.cameraControls.rotation.theta) * Math.cos(AppState.cameraControls.rotation.phi)
+                    );
+                }
+            }
+            btn.addEventListener('click', () => setFP(!AppState.firstPerson));
+            // initialize state
+            setFP(false);
+        })();
+
+        // Reset simulation: clear clouds, rain, lightning, downbursts and reset counters
+        function resetSimulation() {
+            // clear clouds
+            if (AppState.cloudSystem) {
+                AppState.cloudSystem.clouds.forEach(c => {
+                    if (!c) return;
+                    c.puffs.forEach(p => {
+                        if (!p) return;
+                        if (p.geometry) p.geometry.dispose();
+                        if (p.material) p.material.dispose();
+                    });
+                    if (c.grp) AppState.cloudSystem.group.remove(c.grp);
+                });
+                AppState.cloudSystem.clouds = [];
+                AppState.cloudSystem.clusterCenters = [];
+                AppState.cloudSystem.updrafts = [];
+            }
+
+            // clear precipitation
+            if (AppState.rainSystem) {
+                for (let i = 0; i < AppState.rainSystem.max; i++) {
+                    AppState.rainSystem.drops[i] = { active: false };
+                    AppState.rainSystem.pos[i * 3] = 0;
+                    AppState.rainSystem.pos[i * 3 + 1] = -1000;
+                    AppState.rainSystem.pos[i * 3 + 2] = 0;
+                }
+                AppState.rainSystem.rain.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // clear lightning
+            if (AppState.lightningSystem) {
+                AppState.lightningSystem.bolts.forEach(b => {
+                    if (b.geometry) b.geometry.dispose();
+                    if (b.material) b.material.dispose();
+                    AppState.scene.remove(b);
+                });
+                AppState.lightningSystem.bolts = [];
+                AppState.lightningSystem.charge = 0;
+                AppState.lightningSystem.count = 0;
+            }
+
+            // clear downbursts
+            if (AppState.downburstSystem) AppState.downburstSystem.events = [];
+
+            // reset camera to safe orbit
+            AppState.firstPerson = false;
+            document.getElementById('fp-toggle').classList.remove('active');
+            document.getElementById('fp-toggle').textContent = 'FP Mode';
+            AppState.camera.position.set(0, 25, 70);
+            AppState.cameraControls.distance = 70;
+            AppState.cameraControls.rotation.theta = 0;
+            AppState.cameraControls.rotation.phi = Math.PI / 5.5;
+        }
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            resetSimulation();
+        });
     </script>
 </body>
 </html>
