@@ -205,6 +205,11 @@
                 <option value="particles">Particles</option>
             </select>
         </div>
+        <!-- Evaporation multiplier slider -->
+        <div style="font-size:12px; color:#ddd; margin-bottom:8px;">
+            <div style="margin-bottom:4px;">Evaporation</div>
+            <input id="evap-range" type="range" min="0.2" max="2.0" step="0.1" value="1" style="width:100%;" />
+        </div>
         <div style="font-size:12px; color:#ddd;">
             <div style="margin-bottom:4px;">Pixel Ratio</div>
             <input id="px-range" type="range" min="0.5" max="2" step="0.1" value="1" style="width:100%;" />
@@ -220,6 +225,9 @@
         <button id="reset-btn" style="background: rgba(0,0,0,0.75); color:white; border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:10px; cursor:pointer; font-family:'Courier New', monospace; font-size:13px; backdrop-filter: blur(6px);">🔄 Reset</button>
         <button id="fp-toggle" style="background: rgba(0,0,0,0.75); color:white; border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:10px; cursor:pointer; font-family:'Courier New', monospace; font-size:13px; backdrop-filter: blur(6px);">FP Mode</button>
     </div>
+
+    <!-- Forward hold button (mobile/touch friendly) -->
+    <button id="forward-btn" title="Hold to move forward" style="position: absolute; right: 16px; bottom: 140px; width: 72px; height: 44px; border-radius: 10px; background: rgba(0,0,0,0.75); color: white; border:1px solid rgba(255,255,255,0.08); z-index: 120; font-family:'Courier New', monospace; font-size:13px;">Forward</button>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
@@ -261,7 +269,8 @@
             volumetric: true,
             volumetricDensity: 0.45,
             volumetricResolution: 12,
-            cloudRenderMode: 'volumetric'
+            cloudRenderMode: 'volumetric',
+            evapMultiplier: 1   // <- evaporation multiplier
         };
 
         // environmental helper: temperature (°C) and humidity (0..1) estimate at position
@@ -904,6 +913,14 @@
                         c.stage = 'cumulonimbus';
                         growthStage = 'mature';
                     }
+
+                    // promote to supercell when cumulonimbus is tall, heavy and strongly condensed
+                    if (c.stage === 'cumulonimbus' && c.cloudTop > 36 && c.mass > 7 && c.condensationLevel > 0.8) {
+                        c.stage = 'supercell';
+                        growthStage = 'mature';
+                        // supercells have stronger turbulence and broader anvils
+                        c.turbulence = Math.max(c.turbulence, 0.6);
+                    }
                     
                     if (c.age > c.maxAge * 0.7) {
                         growthStage = 'dissipating';
@@ -926,6 +943,22 @@
                                 2 + Math.random() * 3,
                                 0.2,
                                 0
+                            );
+                            c.puffs.push(anvilPuff);
+                            c.grp.add(anvilPuff);
+                        }
+                    } else if (c.stage === 'supercell') {
+                        effectiveGrowthRate *= (1 + updraftLift * 2.2);
+                        c.horizontalSpread = 1.8 + c.widthFactor * 0.6;
+                        // stronger anvil and overshooting top for supercells
+                        if (c.puffs.length % 16 === 0) {
+                            const anvilPuff = this.makePuff(
+                                (Math.random() - 0.5) * (c.radius + 8),
+                                c.cloudTop + 3 + Math.random() * 2,
+                                (Math.random() - 0.5) * (c.radius + 8),
+                                2.5 + Math.random() * 3.5,
+                                0.25,
+                                0.4
                             );
                             c.puffs.push(anvilPuff);
                             c.grp.add(anvilPuff);
@@ -1277,6 +1310,11 @@
                 }
 
                 if (mature.length > 0) {
+                    // Safety defaults for visual multipliers used below so undefined references can't occur.
+                    const virgaOpacityFactor = 1.0;
+                    const downburstInfluence = 0.0;
+                    const baseOffset = 0.0;
+                    
                     mature.forEach((c, idx) => {
                         // Precip intensity scaled by both cloud height and condensation (maturity)
                         const heightFactor = Math.max(0.9, 1 + (c.height - 12) * 0.05);
@@ -1287,40 +1325,12 @@
                         // stronger visual shafts for taller/heavier clouds: color shifts and opacity increases
                         if (this.enableShafts && intensity > 0.12 && shaftHeight > 2) {
                             
-                            // Check for Virga/Evaporation: Sample humidity near ground (altitude 5)
-                            const env = sampleEnvironment(c.x, c.z, 5);
-                            let baseOffset = 0; // how high above ground the shaft stops
-                            let virgaOpacityFactor = 1.0;
-                            
-                            // Virga effect: If humidity is low, lift the base of the shaft
-                            if (env.humidity < 0.55) {
-                                const dryFactor = 1 - env.humidity / 0.55; // 0 to 1
-                                baseOffset = dryFactor * 10; // Shaft stops 0-10 units above ground
-                                virgaOpacityFactor = 1 - dryFactor * 0.3; // Make it slightly fainter
-                            }
-
-                            // Check for Downburst influence
-                            let downburstInfluence = 0;
-                            let flareRadius = 1.0;
-                            const activeDownburst = AppState.downburstSystem.events.find(ev => {
-                                const dist = Math.sqrt((c.x - ev.x) ** 2 + (c.z - ev.z) ** 2);
-                                // Ensure the cloud is covering the downburst center
-                                return dist < c.radius * 0.7 && ev.life > 10;
-                            });
-
-                            if (activeDownburst) {
-                                // If downburst active, make the base flare out
-                                downburstInfluence = Math.min(1, activeDownburst.strength / 15);
-                                flareRadius = 1.0 + downburstInfluence * 0.6; // 1.0 to 1.6 scale increase at base
-                                baseOffset = 0; // Downburst likely forces rain to ground, overriding virga lift
-                            }
-                            
-                            // Create a simplified pooled volumetric column (one per mature cloud)
-                            // Reuse existing Points (shaft) if available, otherwise create
+                            // Create or reuse a pooled shaft object for this cloud, store shaft points in local space and position the shaft at the cloud x,z so it follows the cloud
                             let shaftObj = this._shaftPool[this._nextShaft++];
                             if (!shaftObj) {
                                 const pcnt = 160;
                                 const pGeo = new THREE.BufferGeometry();
+                                // positions stored in local space (around 0,0) and we'll position the Points group at the cloud's horizontal pos
                                 const pPos = new Float32Array(pcnt * 3);
                                 for (let pi = 0; pi < pcnt; pi++) {
                                     pPos[pi*3] = 0;
@@ -1328,7 +1338,6 @@
                                     pPos[pi*3+2] = 0;
                                 }
                                 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-                                // define baseCol used for shaft material (was undefined)
                                 const baseCol = new THREE.Color(0xaaccff);
                                 const pMat = new THREE.PointsMaterial({
                                     size: 0.28,
@@ -1339,24 +1348,30 @@
                                     blending: THREE.NormalBlending
                                 });
                                 shaftObj = new THREE.Points(pGeo, pMat);
-                                shaftObj.userData = { life: 1.0, baseCol };
+                                // keep lightweight userData for animation state; offsetY acts as vertical displacement applied to the local positions
+                                shaftObj.userData = { life: 1.0, baseCol, offsetY: 0.0, vy: 0.006 + Math.random() * 0.006, pulse: intensity };
+                                // ensure shaft is positioned at ground-level initially
+                                shaftObj.position.set(c.x, 0, c.z);
                                 this._shaftPool.push(shaftObj);
                                 this.rainshaftGroup.add(shaftObj);
                             }
-                            // populate positions within a vertical column for this cloud
+                            // fill local-space positions for this shaft (columns around 0,0) and then position shaft object at cloud horizontal location to follow cloud movement
                             const pArr = shaftObj.geometry.attributes.position.array;
                             const pcnt = pArr.length / 3;
                             for (let pi = 0; pi < pcnt; pi++) {
                                 const layerFrac = Math.random();
-                                const y = layerFrac * shaftHeight * 0.9 + 0.5;
+                                // local Y within shaft height; offsetY is applied here so the whole column visually falls/rises
+                                const localY = layerFrac * shaftHeight * 0.9 + 0.5 + (shaftObj.userData.offsetY || 0);
                                 const rrand = Math.random() * shaftRadius * (0.85 + 0.3 * (Math.random()-0.5));
                                 const ang = Math.random() * Math.PI * 2;
-                                pArr[pi*3] = c.x + Math.cos(ang) * rrand + (Math.random()-0.5)*0.06;
-                                pArr[pi*3+1] = y;
-                                pArr[pi*3+2] = c.z + Math.sin(ang) * rrand + (Math.random()-0.5)*0.06;
+                                // store local X/Z around origin; the Points object's world position is set to cloud x,z so the shaft follows the cloud horizontally
+                                pArr[pi*3] = Math.cos(ang) * rrand + (Math.random()-0.5)*0.06;
+                                pArr[pi*3+1] = localY;
+                                pArr[pi*3+2] = Math.sin(ang) * rrand + (Math.random()-0.5)*0.06;
                             }
                             shaftObj.geometry.attributes.position.needsUpdate = true;
-                            shaftObj.position.set(0,0,0);
+                            // attach shaft to cloud position so it follows cloud movement and allow vertical offset to simulate falling shafts and virga
+                            shaftObj.position.set(c.x, 0, c.z);
                             // fade and slight spread driven by intensity and downburst influence
                             shaftObj.material.opacity = Math.min(0.7, 0.18 + intensity * 0.5) * virgaOpacityFactor * (1 + downburstInfluence * 0.9);
                             shaftObj.userData.pulse = intensity * (1 + c.condensationLevel * 0.6);
@@ -1366,7 +1381,6 @@
                                 let ring = this._ringPool[this._nextRing++];
                                 if (!ring) {
                                     const ringGeo = new THREE.RingGeometry(1, 1.4, 28);
-                                    // ensure baseCol is defined in this scope
                                     const baseCol = new THREE.Color(0xaaccff);
                                     const ringMat = new THREE.MeshBasicMaterial({ color: baseCol, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
                                     ring = new THREE.Mesh(ringGeo, ringMat);
@@ -1379,6 +1393,64 @@
                                 ring.position.set(c.x, 0.6, c.z);
                                 ring.material.opacity = Math.min(0.5, 0.06 + intensity * 0.22) * (1 + downburstInfluence * 1.8);
                                 ring.userData.created = performance.now();
+                            }
+                        }
+
+                        // Animate pooled shafts and rings: gentle breathing, fall and ring fade
+                        const now = performance.now();
+                        // reset pool indices for reuse next frame
+                        this._nextShaft = this._nextShaft || 0;
+                        this._nextRing = this._nextRing || 0;
+                        // animate shafts
+                        for (let si = 0; si < this._shaftPool.length; si++) {
+                            const obj = this._shaftPool[si];
+                            if (!obj) continue;
+                            const pulse = obj.userData.pulse || 0.6;
+                            // gentle opacity breathing
+                            obj.material.opacity = Math.max(0.02, Math.min(0.9, obj.material.opacity * (0.985 + 0.03 * pulse)));
+                            // slight horizontal drift from low-level wind — because the Points group is positioned at cloud x,z, add small local drift to mimic shear
+                            const lowWind = this.windFieldRef.getAt(obj.position.x || 0, 2, obj.position.z || 0);
+                            obj.position.x += (lowWind.x || 0) * 0.002 * (0.5 + pulse);
+                            obj.position.z += (lowWind.z || 0) * 0.002 * (0.5 + pulse);
+
+                            // apply slow fall to the shaft offsetY and allow updrafts to push upward; offsetY is in world units and applied to the local positions
+                            const baseFall = obj.userData.vy || 0.006;
+                            const updraftStrength = (AppState.updraftSystem ? AppState.updraftSystem.getUpdraftAt(obj.position.x || 0, obj.position.z || 0) : 0);
+                            const lift = updraftStrength * 0.06;
+                            // positive offsetY moves points upward; to make shafts visually fall downward we ADD baseFall (so offset grows positive) and subtract lift
+                            obj.userData.offsetY = (obj.userData.offsetY || 0) + baseFall - lift;
+                            // clamp offset so it doesn't runaway; allow shafts to descend several units (virga) or be lifted back
+                            obj.userData.offsetY = Math.max(-shaftHeight * 0.9, Math.min(12, obj.userData.offsetY));
+                            // slowly reduce vy to simulate particle settling
+                            obj.userData.vy *= 0.995;
+
+                            // apply offsetY to geometry positions each frame (cheap per-shaft update)
+                            const pArrLocal = obj.geometry.attributes.position.array;
+                            const pcntLocal = pArrLocal.length / 3;
+                            for (let pi = 0; pi < pcntLocal; pi++) {
+                                // original stored base Y is used as baseline; we add offsetY each frame for animation
+                                // to avoid drifting numbers unbounded, recalculate from a pseudo-base stored in userData when first created
+                                if (!obj.userData._baseY) {
+                                    obj.userData._baseY = new Float32Array(pcntLocal);
+                                    for (let k = 0; k < pcntLocal; k++) obj.userData._baseY[k] = pArrLocal[k*3+1];
+                                }
+                                pArrLocal[pi*3+1] = obj.userData._baseY[pi] + (obj.userData.offsetY || 0);
+                            }
+                            obj.geometry.attributes.position.needsUpdate = true;
+                        }
+                        // animate rings and fade them out gradually
+                        for (let ri = 0; ri < this._ringPool.length; ri++) {
+                            const ring = this._ringPool[ri];
+                            if (!ring) continue;
+                            const age = (now - (ring.userData.created || now)) * 0.001;
+                            // fade based on elapsed time
+                            ring.material.opacity *= 0.985;
+                            const s = 1 + 0.02 * Math.sin(now * 0.004 + (ring.userData.pulse || 0));
+                            ring.scale.set(ring.scale.x * s, 1, ring.scale.z * s);
+                            // if very faint, hide to avoid waste
+                            if (ring.material.opacity < 0.01) {
+                                ring.material.opacity = 0;
+                                ring.position.set(0, -1000, 0);
                             }
                         }
 
@@ -1962,6 +2034,243 @@
             }
         }
 
+        // Tornado system: attaches to supercell clouds and injects strong rotating inflow/outflow winds
+        class TornadoSystem {
+            constructor(windFieldRef, cloudSystemRef) {
+                this.windField = windFieldRef;
+                this.cloudSystem = cloudSystemRef;
+                this.tornadoes = [];
+                this.cooldown = 0;
+                this.group = new THREE.Group();
+                AppState.scene.add(this.group);
+            }
+
+            spawnFromCloud(cloud) {
+                // ensure tornadoes only spawn from robust supercells with strong vertical structure and mature updrafts
+                if (!cloud || cloud.stage !== 'supercell' || cloud.dying) return;
+                // require significant vertical extent and a pronounced base/top separation and mass
+                const cloudVerticalExtent = Math.max(0, (cloud.cloudTop || cloud.height) - (cloud.cloudBase || (cloud.height - 8)));
+                if (cloudVerticalExtent < 16 || cloud.mass < 7.5 || cloud.condensationLevel < 0.6) return;
+
+                const existing = this.tornadoes.find(t => t.cloud === cloud);
+                if (existing) return;
+
+                const baseRadius = 3.5 + Math.random() * 3.0;
+                const topRadius = 0.6 + Math.random() * 0.6;
+                // make funnel height tied to cloud base/top so it anchors correctly
+                const height = Math.max(18, cloud.cloudTop - cloud.cloudBase + 4);
+                const segs = 24;
+
+                const funnelGeo = new THREE.CylinderGeometry(topRadius, baseRadius, height, segs, 1, true);
+                funnelGeo.translate(0, height * 0.5, 0);
+
+                const funnelMat = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(0x8690a0),
+                    transparent: true,
+                    opacity: 0.0, // keep mesh invisible; visuals from debris & particle column
+                    metalness: 0.05,
+                    roughness: 0.85,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+
+                const funnel = new THREE.Mesh(funnelGeo, funnelMat);
+                funnel.castShadow = false;
+                funnel.receiveShadow = false;
+                funnel.visible = false;
+
+                const coreLight = new THREE.PointLight(0xaad0ff, 1.2, Math.max(30, height * 1.2), 2);
+                coreLight.position.set(0, height * 0.45, 0);
+
+                // more detailed debris/column particles with height-proportional distribution and variable spiral speeds
+                const debrisCount = 500;
+                const dGeo = new THREE.BufferGeometry();
+                const dPos = new Float32Array(debrisCount * 3);
+                const dVel = new Float32Array(debrisCount * 3);
+                const dPhase = new Float32Array(debrisCount); // phase per particle so spiral isn't uniform
+                for (let i = 0; i < debrisCount; i++) {
+                    const hFrac = Math.random();
+                    const radialBias = 0.3 + (1 - hFrac) * 0.7;
+                    const r = radialBias * baseRadius * (0.3 + Math.random() * 0.9);
+                    const ang = Math.random() * Math.PI * 2;
+                    dPos[i*3] = Math.cos(ang) * r;
+                    dPos[i*3+1] = 0.5 + hFrac * height;
+                    dPos[i*3+2] = Math.sin(ang) * r;
+                    // velocities tuned so upper particles have stronger tangential motion and slower fall
+                    const tangential = 0.02 + (1 - hFrac) * 0.12;
+                    const downward = 0.006 + hFrac * 0.04;
+                    dVel[i*3] = -Math.sin(ang) * tangential;
+                    dVel[i*3+1] = -downward;
+                    dVel[i*3+2] = Math.cos(ang) * tangential;
+                    dPhase[i] = Math.random() * Math.PI * 2;
+                }
+                dGeo.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
+                dGeo.setAttribute('velocity', new THREE.BufferAttribute(dVel, 3));
+                dGeo.setAttribute('phase', new THREE.BufferAttribute(dPhase, 1));
+                const dMat = new THREE.PointsMaterial({
+                    size: 0.45,
+                    color: 0x9fd5ff,
+                    transparent: true,
+                    opacity: 0.95,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    sizeAttenuation: true
+                });
+                const debris = new THREE.Points(dGeo, dMat);
+
+                const container = new THREE.Group();
+                container.add(funnel);
+                container.add(coreLight);
+                container.add(debris);
+                container.position.set(cloud.x, 0, cloud.z);
+                this.group.add(container);
+
+                const tornado = {
+                    cloud,
+                    obj: container,
+                    funnel,
+                    debris,
+                    baseRadius,
+                    topRadius,
+                    height,
+                    life: 700 + Math.random() * 400,
+                    maxLife: 700 + Math.random() * 400,
+                    strength: 10 + Math.random() * 10,
+                    spinSign: Math.random() > 0.5 ? 1 : -1
+                };
+
+                this.tornadoes.push(tornado);
+
+                // camera shake on tornado birth
+                AppState.cameraControls.shake.intensity = Math.max(AppState.cameraControls.shake.intensity, 1.3);
+                AppState.cameraControls.shake.duration = 800;
+                AppState.cameraControls.shake.time = 0;
+            }
+
+            applyToWind(tornado) {
+                const size = this.windField.size;
+                const spacing = this.windField.spacing;
+                const rMax = tornado.baseRadius * 3.3;
+                const x0 = tornado.obj.position.x;
+                const z0 = tornado.obj.position.z;
+
+                for (let gx = 0; gx < size; gx++) {
+                    for (let gz = 0; gz < size; gz++) {
+                        const wx = (gx - size / 2) * spacing;
+                        const wz = (gz - size / 2) * spacing;
+                        const dx = wx - x0;
+                        const dz = wz - z0;
+                        const dist = Math.sqrt(dx*dx + dz*dz);
+                        if (dist > rMax || dist < 0.001) continue;
+
+                        const inv = 1 / dist;
+                        const ux = dx * inv;
+                        const uz = dz * inv;
+                        const tx = -uz;
+                        const tz = ux;
+
+                        const core = 1 - Math.min(1, dist / rMax);
+                        const inflow = tornado.strength * 1.2 * core;
+                        const spin = tornado.strength * 0.9 * core * tornado.spinSign;
+
+                        for (let gy = 0; gy < Math.min(this.windField.size, 10); gy++) {
+                            const cell = this.windField.field[gx][gy][gz];
+                            cell.x += (-ux * inflow + tx * spin) * 0.12;
+                            cell.z += (-uz * inflow + tz * spin) * 0.12;
+                            // vertical marker for intense updraft
+                            cell.__updraft = (cell.__updraft || 0) + core * 0.12;
+                        }
+                    }
+                }
+            }
+
+            update(t) {
+                if (!this.cloudSystem) return;
+
+                if (this.cooldown > 0) this.cooldown--;
+
+                // look for supercell clouds and occasionally spawn tornadoes
+                if (this.cooldown === 0) {
+                    const candidates = this.cloudSystem.clouds.filter(c => c.stage === 'supercell' && !c.dying && c.mass > 7);
+                    if (candidates.length > 0 && Math.random() < 0.005) {
+                        const c = candidates[Math.floor(Math.random() * candidates.length)];
+                        this.spawnFromCloud(c);
+                        this.cooldown = 1200 + Math.floor(Math.random() * 800);
+                    }
+                }
+
+                for (let i = this.tornadoes.length - 1; i >= 0; i--) {
+                    const tno = this.tornadoes[i];
+                    const cloud = tno.cloud;
+
+                    // follow parent cloud slowly
+                    if (cloud && !cloud.dying) {
+                        const targetX = cloud.x;
+                        const targetZ = cloud.z;
+                        tno.obj.position.x += (targetX - tno.obj.position.x) * 0.06;
+                        tno.obj.position.z += (targetZ - tno.obj.position.z) * 0.06;
+                        // adjust funnel height with cloud base/top
+                        const newHeight = Math.max(18, cloud.cloudBase + 8);
+                        if (Math.abs(newHeight - tno.height) > 0.5) {
+                            tno.height += (newHeight - tno.height) * 0.15;
+                            tno.funnel.scale.y = tno.height / Math.max(1, tno.funnel.geometry.parameters.height || tno.height);
+                        }
+                    }
+
+                    // spin funnel
+                    tno.obj.rotation.y += 0.04 * tno.spinSign;
+
+                    // update debris (blue particles slowly falling)
+                    const posAttr = tno.debris.geometry.attributes.position;
+                    const velAttr = tno.debris.geometry.attributes.velocity;
+                    const p = posAttr.array;
+                    const v = velAttr.array;
+                    const count = p.length / 3;
+                    for (let j = 0; j < count; j++) {
+                        const idx = j * 3;
+                        p[idx]     += v[idx]     * 1.0;
+                        p[idx + 1] += v[idx + 1] * 1.0;
+                        p[idx + 2] += v[idx + 2] * 1.0;
+
+                        // spiral and reset once near ground
+                        const r = Math.sqrt(p[idx]*p[idx] + p[idx+2]*p[idx+2]) + 0.0001;
+                        const ang = Math.atan2(p[idx+2], p[idx]) + 0.1 * tno.spinSign;
+                        const baseR = Math.min(tno.baseRadius * 1.2, r + 0.02);
+                        p[idx] = Math.cos(ang) * baseR;
+                        p[idx+2] = Math.sin(ang) * baseR;
+
+                        if (p[idx+1] < 0.6) {
+                            // respawn higher up
+                            const nr = Math.random() * tno.baseRadius * 0.9;
+                            const nang = Math.random() * Math.PI * 2;
+                            p[idx] = Math.cos(nang) * nr;
+                            p[idx+1] = 2 + Math.random() * (tno.height * 0.9);
+                            p[idx+2] = Math.sin(nang) * nr;
+                        }
+                    }
+                    posAttr.needsUpdate = true;
+
+                    // apply wind influence
+                    this.applyToWind(tno);
+
+                    // fade over lifetime
+                    tno.life--;
+                    const lifeFrac = Math.max(0, tno.life / tno.maxLife);
+                    tno.funnel.material.opacity = 0.2 + lifeFrac * 0.5;
+                    tno.debris.material.opacity = 0.3 + lifeFrac * 0.6;
+
+                    if (tno.life <= 0 || (cloud && cloud.dying)) {
+                        this.group.remove(tno.obj);
+                        tno.funnel.geometry.dispose();
+                        tno.funnel.material.dispose();
+                        tno.debris.geometry.dispose();
+                        tno.debris.material.dispose();
+                        this.tornadoes.splice(i, 1);
+                    }
+                }
+            }
+        }
+
         function setupControls() {
             // Mouse controls
             // Use Pointer Events for consistent mouse & touch drag handling on the renderer canvas
@@ -2206,6 +2515,8 @@
                 }
             })(AppState.windField, AppState.cloudSystem);
             
+            AppState.tornadoSystem = new TornadoSystem(AppState.windField, AppState.cloudSystem);
+            
             setupControls();
             // detect CPU & GPU and display
             (function detectHardware() {
@@ -2241,6 +2552,10 @@
             requestAnimationFrame(animate);
             const t = performance.now();
 
+            // compute delta time in seconds for movement integration
+            const dt = ((t - (AppState._lastTime || t)) / 1000) || 0;
+            AppState._lastTime = t;
+
             if (AppState.paused) {
                 // Still render the current scene so camera can be moved while paused
                 AppState.renderer.render(AppState.scene, AppState.camera);
@@ -2250,12 +2565,28 @@
             const ws = AppState.windField.update(t);
             // Apply downburst effects after base wind update so perturbations persist for this frame
             if (AppState.downburstSystem) AppState.downburstSystem.update(t);
+            if (AppState.tornadoSystem) AppState.tornadoSystem.update(t);
             const windSpeed = Math.sqrt(ws.x * ws.x + ws.z * ws.z);
             
             AppState.evaporationSystem.update();
             AppState.cloudSystem.update(t);
             const activePart = AppState.rainSystem.update();
             AppState.lightningSystem.update(t);
+
+            // Apply first-person movement based on joystick / forward button inputs
+            if (AppState.firstPerson) {
+                // movement speed (units per second)
+                const baseSpeed = AppState.cameraControls.speed * (AppState.cameraControls.move.forward ? 1 : 1) * (keys && keys['shift'] ? AppState.cameraControls.runMultiplier : 1) || AppState.cameraControls.speed;
+                // compute forward/right basis from yaw
+                const yaw = AppState.cameraControls.rotation.yaw || 0;
+                const forwardVec = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+                const rightVec = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)).normalize();
+                // apply movement scaled by dt so button hold speed is consistent
+                const moveForward = (AppState.cameraControls.move.forward || 0);
+                const moveRight = (AppState.cameraControls.move.right || 0);
+                AppState.camera.position.addScaledVector(forwardVec, moveForward * baseSpeed * dt * 3.0);
+                AppState.camera.position.addScaledVector(rightVec, moveRight * baseSpeed * dt * 3.0);
+            }
 
             // Positional camera shake handling (shake applied to lookAt target)
             const shake = AppState.cameraControls.shake;
@@ -2640,6 +2971,27 @@
         document.getElementById('reset-btn').addEventListener('click', () => {
             resetSimulation();
         });
+
+        // Forward button wiring (touch / hold)
+        (function setupForwardButton() {
+            const fbtn = document.getElementById('forward-btn');
+            if (!fbtn) return;
+            let pointerActive = false;
+            const setForward = (v) => { AppState.cameraControls.move.forward = v ? 1 : 0; };
+            fbtn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                pointerActive = true;
+                setForward(true);
+            });
+            window.addEventListener('pointerup', (e) => {
+                if (!pointerActive) return;
+                pointerActive = false;
+                setForward(false);
+            });
+            // also support touchend/cancel
+            fbtn.addEventListener('pointercancel', () => { pointerActive = false; setForward(false); });
+            // keyboard 'w' already sets move.forward via updateKeyboardMovement; ensure releasing W stops movement
+        })();
     </script>
 </body>
 </html>
