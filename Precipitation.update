@@ -1,0 +1,79 @@
+// ... existing code inside class Precipitation ...
+                if (this.enableShafts && intensity > 0.12 && shaftHeight > 2) {
+                            let shaftObj = this._shaftPool[this._nextShaft++];
+                             if (!shaftObj) {
+                                 const pcnt = 160;
+                                 const pGeo = new THREE.BufferGeometry();
+                                 const pPos = new Float32Array(pcnt * 3);
+                                 for (let pi = 0; pi < pcnt; pi++) {
+                                     pPos[pi*3] = 0;
+                                     pPos[pi*3+1] = -1000;
+                                     pPos[pi*3+2] = 0;
+                                 }
+                                 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+                                // define baseCol used for shaft material 
+                                const baseCol = new THREE.Color(0xaaccff);
+                                const pMat = new THREE.PointsMaterial({
+                                     size: 0.28,
+                                     color: baseCol,
+                                     transparent: true,
+                                     opacity: Math.min(0.45, 0.25 + intensity * 0.4) * virgaOpacityFactor,
+                                     depthWrite: false,
+                                     blending: THREE.NormalBlending
+                                 });
+                                 shaftObj = new THREE.Points(pGeo, pMat);
+                                // add slow fall state so shafts visibly descend; they will be influenced by updrafts
+                                shaftObj.userData = { life: 1.0, baseCol, offsetY: 0.0, vy: 0.02 + Math.random() * 0.02 };
+                                 this._shaftPool.push(shaftObj);
+                                 this.rainshaftGroup.add(shaftObj);
+                             }
+                             // populate positions within a vertical column for this cloud
+                             const pArr = shaftObj.geometry.attributes.position.array;
+                             const pcnt = pArr.length / 3;
+                             for (let pi = 0; pi < pcnt; pi++) {
+                                 const layerFrac = Math.random();
+                                // base vertical positions within the shaft height plus current offset (offsetY is negative as it falls)
+                                const y = layerFrac * shaftHeight * 0.9 + 0.5 + (shaftObj.userData.offsetY || 0);
+                                 const rrand = Math.random() * shaftRadius * (0.85 + 0.3 * (Math.random()-0.5));
+                                 const ang = Math.random() * Math.PI * 2;
+                                 pArr[pi*3] = c.x + Math.cos(ang) * rrand + (Math.random()-0.5)*0.06;
+                                 pArr[pi*3+1] = y;
+                                 pArr[pi*3+2] = c.z + Math.sin(ang) * rrand + (Math.random()-0.5)*0.06;
+                             }
+                             shaftObj.geometry.attributes.position.needsUpdate = true;
+                             shaftObj.position.set(0,0,0);
+                             // fade and slight spread driven by intensity and downburst influence
+                             shaftObj.material.opacity = Math.min(0.7, 0.18 + intensity * 0.5) * virgaOpacityFactor * (1 + downburstInfluence * 0.9);
+                             shaftObj.userData.pulse = intensity * (1 + c.condensationLevel * 0.6);
+ 
+                             // subtle particle ring near ground to convey outward gust
+// Animate pooled shafts and rings: gentle breathing and ring fade
+                 const now = performance.now();
+                 // reset pool indices for reuse next frame
+                 this._nextShaft = this._nextShaft || 0;
+                 this._nextRing = this._nextRing || 0;
+                 // animate shafts
+                 for (let si = 0; si < this._shaftPool.length; si++) {
+                     const obj = this._shaftPool[si];
+                     if (!obj) continue;
+                     const pulse = obj.userData.pulse || 0.6;
+                    obj.material.opacity = Math.max(0.02, Math.min(0.9, obj.material.opacity * (0.985 + 0.03 * pulse)));
+                    // slight horizontal drift from low-level wind
+                    const lowWind = this.windFieldRef.getAt(obj.position.x || 0, 2, obj.position.z || 0);
+                    obj.position.x += (lowWind.x || 0) * 0.002 * (0.5 + pulse);
+                    obj.position.z += (lowWind.z || 0) * 0.002 * (0.5 + pulse);
+                    // apply slow fall to the shaft offsetY and allow updrafts to push upward
+                    // base fall speed (units/frame) is small so shafts descend visibly slower than drops
+                    const baseFall = obj.userData.vy || 0.02;
+                    // get updraft influence from global updraft system (if present)
+                    const updraftStrength = (AppState.updraftSystem ? AppState.updraftSystem.getUpdraftAt(obj.position.x || 0, obj.position.z || 0) : 0);
+                    // also read any per-cell updraft marker inserted into windField cells
+                    const cellUp = (this.windFieldRef && this.windFieldRef.getAt) ? (this.windFieldRef.getAt(obj.position.x || 0, 2, obj.position.z || 0).__updraft || 0) : 0;
+                    // net vertical change: fall minus lift contributions
+                    const lift = (updraftStrength * 0.06) + (cellUp * 0.3);
+                    obj.userData.offsetY = (obj.userData.offsetY || 0) - baseFall + lift;
+                    // clamp offset to reasonable bounds so shaft doesn't float off-screen
+                    obj.userData.offsetY = Math.max(-shaftHeight * 0.9, Math.min(12, obj.userData.offsetY));
+                    // gently dampen vertical velocity randomness so shafts don't accelerate uncontrollably
+                    obj.userData.vy *= 0.995;
+                 }
