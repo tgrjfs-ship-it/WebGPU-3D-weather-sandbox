@@ -258,6 +258,9 @@
             }
         };
 
+        // make keyboard state global so animate() and other modules can read it reliably
+        window.keys = window.keys || {};
+
         // Graphics settings defaults
         const Graphics = {
             shadows: true,
@@ -270,7 +273,11 @@
             volumetricDensity: 0.45,
             volumetricResolution: 12,
             cloudRenderMode: 'volumetric',
-            evapMultiplier: 1   // <- evaporation multiplier
+            evapMultiplier: 1,
+            hailDensity: 1.2,           // NEW: hail particle density
+            windLayerComplexity: 2.0,   // NEW: wind field layer interactions
+            microphysicsDetail: 1.5,    // NEW: precipitation microphysical complexity
+            atmosphericStability: true  // NEW: CAPE/stability calculations
         };
 
         // environmental helper: temperature (°C) and humidity (0..1) estimate at position
@@ -657,6 +664,59 @@
                 return cluster;
             }
 
+            // Replace the rainshaft point system with 3D mesh geometry
+            _createInstancedShaftForCloud(cloud, intensity) {
+                // Create a complex 3D funnel/shaft with segmented cylindrical meshes
+                const segments = 12;
+                const baseRadius = Math.max(2.8, (cloud.radius || 6) * 0.9);
+                const topRadius = baseRadius * 0.22;
+                const height = Math.max(8, (cloud.height || 12) - 0.5);
+                
+                // Create segmented shaft with dynamic radius tapering
+                const shaftGroup = new THREE.Group();
+                const segmentCount = 8;
+                const segmentHeight = height / segmentCount;
+                
+                for (let seg = 0; seg < segmentCount; seg++) {
+                    const ratio = seg / segmentCount;
+                    const currentRadius = baseRadius * (1 - ratio * 0.78);
+                    const nextRadius = baseRadius * (1 - (seg + 1) / segmentCount * 0.78);
+                    
+                    // Create tapered cylinder for this segment
+                    const geo = new THREE.CylinderGeometry(nextRadius, currentRadius, segmentHeight, segments, 1, true);
+                    geo.translate(0, (seg + 0.5) * segmentHeight, 0);
+                    
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(0x88c2ff),
+                        transparent: true,
+                        opacity: Math.max(0.08, (0.35 - ratio * 0.28) * intensity) * (cloud.dying ? 0.6 : 1.0),
+                        metalness: 0.1,
+                        roughness: 0.9,
+                        side: THREE.DoubleSide,
+                        depthWrite: false,
+                        emissive: new THREE.Color(0x4488cc),
+                        emissiveIntensity: 0.12 * intensity
+                    });
+                    
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.castShadow = false;
+                    mesh.receiveShadow = false;
+                    mesh.userData = { segmentIndex: seg, totalSegments: segmentCount };
+                    shaftGroup.add(mesh);
+                }
+                
+                shaftGroup.position.set(cloud.x, 0, cloud.z);
+                shaftGroup.userData = {
+                    cloudRef: cloud,
+                    baseRadius,
+                    topRadius,
+                    height,
+                    intensity
+                };
+                
+                return shaftGroup;
+            }
+
             makePuff(x, y, z, size, dark, turbulence = 0, cloudType = 'cumulus') {
                 // use volumetric resolution from Graphics to adjust geometry detail for performance
                 const res = Math.max(4, Math.floor(Graphics.volumetricResolution));
@@ -664,16 +724,19 @@
                 // --- CIRRUS / HIGH-ALTITUDE SHEET / FIBROUS RENDERING ---
                 if (cloudType && cloudType.startsWith('cirr')) {
                     // thin, stretched semi-transparent planes / streaks to emulate cirrus textures
-                    const geom = new THREE.PlaneGeometry(size * 2.2, size * 0.18, 1, 1);
-                    // rotate the plane to make wispy streak
-                    geom.translate(0, 0, 0);
-                    const mat = new THREE.MeshLambertMaterial({
-                        color: new THREE.Color(0.92, 0.94, 0.98),
+                    const geom = new THREE.IcosahedronGeometry(size * 1.8, 3);
+                    geom.scale(2.2, 0.18, 1.0);
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(0.95, 0.96, 0.99),
                         transparent: true,
                         opacity: Graphics.volumetric ? (0.18 + dark * 0.12) * Graphics.volumetricDensity : 0.16,
                         depthWrite: false,
                         side: THREE.DoubleSide,
                         blending: THREE.NormalBlending,
+                        emissive: new THREE.Color(0.1, 0.15, 0.2),
+                        emissiveIntensity: 0.08,
+                        metalness: 0.0,
+                        roughness: 0.95
                     });
                     const mesh = new THREE.Mesh(geom, mat);
                     mesh.position.set(x, y, z);
@@ -713,8 +776,8 @@
                     return sprite;
                 }
 
-                // volumetric mesh puff (existing approach)
-                const geo = new THREE.SphereGeometry(size, res, Math.max(4, Math.floor(res * 0.8)));
+                // Enhanced volumetric mesh puff with Icosahedron for smoother appearance
+                const geo = new THREE.IcosahedronGeometry(size, Math.max(3, res - 1));
                 
                 // Highly varied shapes for realistic cumulus appearance
                 const scaleX = 0.85 + Math.random() * 0.5 + turbulence * 0.15;
@@ -732,11 +795,16 @@
                 // modulate opacity by volumetric density control and optionally disable volumetric for flat puffs
                 const baseOpacity = 0.45 + dark * 0.25 + turbulence * 0.1;
                 const opacity = Graphics.volumetric ? baseOpacity * Graphics.volumetricDensity : Math.min(1, baseOpacity * 0.75);
-                const mat = new THREE.MeshLambertMaterial({
+                const mat = new THREE.MeshStandardMaterial({
                     color: new THREE.Color(b, b, b + 0.02),
                     transparent: true,
                     opacity: opacity,
-                    depthWrite: false
+                    depthWrite: false,
+                    metalness: 0.05,
+                    roughness: 0.88,
+                    emissive: new THREE.Color(b * 0.08, b * 0.12, b * 0.15),
+                    emissiveIntensity: 0.06 * (1 - Math.max(0, Math.min(1, dark))),
+                    side: THREE.FrontSide
                 });
                 mat.fog = true;
 
@@ -1016,9 +1084,24 @@
                     } else if (c.stage === 'towering_cumulus') {
                         c.horizontalSpread = 1.0 + c.widthFactor * 0.35;
                     } else if (c.stage === 'cumulonimbus') {
-                        c.horizontalSpread = 1.4 + c.widthFactor * 0.45;
+                        // broaden and thicken mature storm anvils and cores
+                        c.horizontalSpread = 1.6 + c.widthFactor * 0.6;
                     } else if (c.stage === 'supercell') {
-                        c.horizontalSpread = 1.8 + c.widthFactor * 0.45;
+                        // supercells: wider, denser cores and larger puff production
+                        c.horizontalSpread = 2.2 + c.widthFactor * 0.8;
+                        // stronger anvil and overshooting top for supercells
+                        if (c.puffs.length % 16 === 0) {
+                            const anvilPuff = this.makePuff(
+                                (Math.random() - 0.5) * (c.radius + 8),
+                                c.cloudTop + 3 + Math.random() * 2,
+                                (Math.random() - 0.5) * (c.radius + 8),
+                                2.5 + Math.random() * 3.5,
+                                0.25,
+                                0.4
+                            );
+                            c.puffs.push(anvilPuff);
+                            c.grp.add(anvilPuff);
+                        }
                     } else if (c.stage && c.stage.startsWith('cirr')) {
                         // cirrus family have broad thin sheets with large horizontal spread and low mass growth
                         c.horizontalSpread = 2.0 + c.widthFactor * 1.2;
@@ -1137,7 +1220,10 @@
                         else if (growthStage === 'mature') puffInterval = 4;
                         
                         if (c.age % puffInterval === 0) {
-                            const puffCount = (updraftLift > 0.5 && growthStage === 'developing') ? 3 : (updraftLift > 0.5 ? 2 : 1);
+                            // increase number and size of puffs for towering/mature storms
+                            let puffCount = (updraftLift > 0.5 && growthStage === 'developing') ? 4 : (updraftLift > 0.5 ? 3 : 1);
+                            if (c.stage === 'cumulonimbus') puffCount = Math.max(puffCount, 3);
+                            if (c.stage === 'supercell') puffCount = Math.max(puffCount, 4);
                             
                             for (let p = 0; p < puffCount; p++) {
                                 const a = Math.random() * Math.PI * 2;
@@ -1150,23 +1236,24 @@
                                 const dark = Math.min(0.65, (c.age / 200) + c.condensationLevel * 0.3 + (growthStage === 'mature' ? 0.15 : 0));
                                 
                                 // Create dense, overlapping structure like real cumulus
-                                const layerCount = (growthStage === 'mature' || dark > 0.4) ? 3 : 2;
+                                const layerCount = (growthStage === 'mature' || dark > 0.35) ? (c.stage === 'supercell' ? 4 : 3) : 2;
                                 for (let layer = 0; layer < layerCount; layer++) {
                                     const angleOffset = (layer * Math.PI * 2) / layerCount;
                                     const radiusOffset = layer * 0.4;
                                     const heightOffset = layer * 0.6 - 0.3;
                                     
                                     // place puffs using the cloud's current radius and widthFactor so new clouds are broader
-                                    const spread = (c.radius * Math.max(1.0, c.widthFactor)) * (0.45 + Math.random() * 0.9);
-                                    const radial = spread * (0.6 + Math.random() * 0.6) + radiusOffset + (Math.sqrt(c.puffs.length) * 0.15);
+                                    const spread = (c.radius * Math.max(1.0, c.widthFactor)) * (0.7 + Math.random() * 1.1); // larger spread for denser cores
+                                    const radial = spread * (0.8 + Math.random() * 0.6) + radiusOffset + (Math.sqrt(c.puffs.length) * 0.2);
                                     const cloudTypeForPuff = (c.stage && c.stage.startsWith('cirr')) ? c.stage : undefined;
+                                    const sizeBoost = (c.stage === 'cumulonimbus' ? 1.2 : (c.stage === 'supercell' ? 1.5 : 1.0));
                                     const puff = this.makePuff(
                                         Math.cos(a + angleOffset) * radial,
                                         h + heightOffset,
                                         Math.sin(a + angleOffset) * radial,
-                                        1.8 + Math.random() * 2.8 + updraftLift * 1.2 + (growthStage === 'mature' ? 0.8 : 0), 
+                                        (1.8 + Math.random() * 2.8 + updraftLift * 1.4 + (growthStage === 'mature' ? 1.0 : 0)) * sizeBoost,
                                         dark + layer * 0.08,
-                                        c.turbulence,
+                                        Math.min(0.9, c.turbulence + (c.stage === 'supercell' ? 0.25 : 0)),
                                         cloudTypeForPuff
                                     );
                                     c.puffs.push(puff);
@@ -1268,13 +1355,15 @@
                 // Strong sources: towering convection and above; weak sources: dissipating clouds still holding moisture.
                 // We now provide a continuous list including dying clouds (weaker) so precipitation systems can sample them every frame.
                 return this.clouds.filter(c => {
-                    if (!c) return false;
-                    // Any mature deep convection or moderately heavy clouds can precipitate
-                    const strongStage = (c.stage === 'cumulonimbus' || c.stage === 'towering_cumulus' || c.stage === 'supercell');
-                    const hasMass = c.mass > 1.0;
-                    const allowDying = c.dying && c.mass > 0.8;
-                    // continuous sources: either strongStage & hasMass or dying but still with mass
-                    return (strongStage && hasMass) || allowDying;
+                    if (!c || !c.grp) return false;
+                    // Include cumulus clouds for light precipitation, expand mature cloud definition
+                    const stage = c.stage || 'cumulus';
+                    const isConvective = (stage === 'cumulus' || stage === 'towering_cumulus' || stage === 'cumulonimbus' || stage === 'supercell');
+                    const hasMass = c.mass > 0.5; // lower threshold for cumulus
+                    const condensationOk = c.condensationLevel > 0.1 || c.age > 30; // allow young clouds
+                    const notTooOld = c.age < c.maxAge * 0.95; // keep precipitating until near end
+                    
+                    return isConvective && hasMass && (condensationOk || !c.dying) && notTooOld;
                 });
             }
         }
@@ -1283,84 +1372,86 @@
             constructor(windFieldRef, cloudSystemRef) {
                 this.windFieldRef = windFieldRef;
                 this.cloudSystemRef = cloudSystemRef;
-                this.max = 3000;
-                this.drops = [];
-                this.vel = [];
-                this.types = [];
-                this.enableShafts = true;
-                this.cloudShafts = new Map();
-                
-                const geo = new THREE.BufferGeometry();
+
+                // particle pool parameters (increased for heavier precipitation)
+                this.max = 2500; // larger pool for heavy storms
+                this.drops = new Array(this.max).fill(null).map(()=>({ active: false }));
                 this.pos = new Float32Array(this.max * 3);
-                this.sizes = new Float32Array(this.max);
-                this.colors = new Float32Array(this.max * 3);
-                this.ages = new Float32Array(this.max);
-                
-                for (let i = 0; i < this.max; i++) {
-                    this.drops.push({ active: false });
-                    this.vel.push({ y: 0, size: 0 });
-                    this.types.push('rain');
-                    this.pos[i * 3] = 0;
-                    this.pos[i * 3 + 1] = -1000;
-                    this.pos[i * 3 + 2] = 0;
-                    this.sizes[i] = 0;
-                    this.colors[i * 3] = 1;
-                    this.colors[i * 3 + 1] = 1;
-                    this.colors[i * 3 + 2] = 1;
-                    this.ages[i] = 0;
-                }
+                this.vel = new Array(this.max).fill(null).map(()=>({ y:0, vx:0, vz:0 }));
+                this.size = new Float32Array(this.max);
+                this.type = new Array(this.max).fill('rain'); // 'rain', 'sleet', 'snow', 'freezing_rain'
+                this.age = new Uint16Array(this.max);
+                this.life = new Float32Array(this.max); // normalized life [0..1] for fades
+                this.quality = new Float32Array(this.max); // microphysical property: droplet concentration / crystal porosity
 
-                geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
-                geo.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
-                geo.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
-                
-                const canvas = document.createElement('canvas');
-                canvas.width = 16;
-                canvas.height = 48;
-                const ctx = canvas.getContext('2d');
-                
-                // Enhanced gradient for more defined raindrops
-                const grad = ctx.createLinearGradient(0, 0, 0, 48);
-                grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-                grad.addColorStop(0.2, 'rgba(230, 245, 255, 0.95)');
-                grad.addColorStop(0.5, 'rgba(200, 230, 255, 0.7)');
-                grad.addColorStop(0.8, 'rgba(160, 200, 240, 0.4)');
-                grad.addColorStop(1, 'rgba(120, 170, 220, 0)');
-                ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, 16, 48);
-                
-                const mat = new THREE.PointsMaterial({
-                    size: 0.8,
-                    transparent: true,
-                    opacity: 0.95,
-                    map: new THREE.CanvasTexture(canvas),
-                    depthWrite: false,
-                    sizeAttenuation: true,
-                    blending: THREE.AdditiveBlending,
-                    vertexColors: true
-                });
-
-                this.rain = new THREE.Points(geo, mat);
-                AppState.scene.add(this.rain);
-                
-                this.createStreakSystem();
+                // shafts (cloud-local organized precipitation columns)
+                // Rainshafts disabled in favor of denser drops and instanced splashes
+                this.cloudShafts = new Map();
+                this.enableShafts = false; // explicitly disable rainshaft meshes
                 this.rainshaftGroup = new THREE.Group();
                 AppState.scene.add(this.rainshaftGroup);
+
+                // pooled geometry + material templates for instancing (kept for compatibility but unused unless re-enabled)
+                this._shaftTemplates = {
+                    coneGeo: new THREE.ConeBufferGeometry(1.0, 1.0, 10, 1, true),
+                    ringGeo: new THREE.RingGeometry(0.6, 1.0, 12),
+                    shaftMat: new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
+                };
+
+                // visible rain points
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+                geo.setAttribute('size', new THREE.BufferAttribute(this.size, 1));
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 16; canvas.height = 48;
+                const ctx = canvas.getContext('2d');
+                const grad = ctx.createLinearGradient(0,0,0,48);
+                grad.addColorStop(0, 'rgba(255,255,255,1)');
+                grad.addColorStop(0.25, 'rgba(200,230,255,0.98)');
+                grad.addColorStop(0.6, 'rgba(140,190,230,0.9)');
+                grad.addColorStop(1, 'rgba(100,150,210,0)');
+                ctx.fillStyle = grad; ctx.fillRect(0,0,16,48);
+
+                this.material = new THREE.PointsMaterial({
+                    size: 1.1,
+                    map: new THREE.CanvasTexture(canvas),
+                    transparent: true,
+                    opacity: 0.98,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    vertexColors: false,
+                    sizeAttenuation: true
+                });
+
+                this.rain = new THREE.Points(geo, this.material);
+                AppState.scene.add(this.rain);
+
+                // streaks for fast drops
+                this.createStreakSystem();
+
+                // microphysics tuning (adjusted for heavier precipitation)
+                this.params = {
+                    globalSlowFactor: 0.78,   // moderate slow-down but not too low (keeps heavy look)
+                    coalesceProb: 0.012,      // higher chance to merge -> bigger drops
+                    breakProb: 0.0012,        // fragmentation of very large drops remains rare
+                    splashParticles: 26,      // more splashes for heavier impacts
+                    evaporationRate: 0.0007   // slight reduction so drops survive longer
+                };
+
+                // temporary working arrays for spawn loops
+                this._spawnScratch = { idxList: [] };
+
+                // pooled shaft mesh instances (reused across clouds)
+                this._shaftPool = [];
             }
 
             createStreakSystem() {
                 this.streakGeometry = new THREE.BufferGeometry();
-                const streakPositions = new Float32Array(300 * 6);
-                this.streakGeometry.setAttribute('position', new THREE.BufferAttribute(streakPositions, 3));
-                
-                const streakMaterial = new THREE.LineBasicMaterial({
-                    color: 0xaaccff,
-                    transparent: true,
-                    opacity: 0.4,
-                    linewidth: 1.5
-                });
-                
-                this.streakLines = new THREE.LineSegments(this.streakGeometry, streakMaterial);
+                const arr = new Float32Array(400 * 6);
+                this.streakGeometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+                this.streakMaterial = new THREE.LineBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.36 });
+                this.streakLines = new THREE.LineSegments(this.streakGeometry, this.streakMaterial);
                 AppState.scene.add(this.streakLines);
             }
 
@@ -1369,325 +1460,562 @@
                 if (newMax === this.max) return;
                 const oldMax = this.max;
                 const oldPos = this.pos;
-                const oldSizes = this.sizes;
-                const oldColors = this.colors;
+                const oldSize = this.size;
                 const oldDrops = this.drops;
                 const oldVel = this.vel;
-                const oldTypes = this.types;
+                const oldType = this.type;
+                const oldAge = this.age;
+                const oldLife = this.life;
+                const oldQual = this.quality;
 
                 this.max = newMax;
-                this.drops = [];
-                this.vel = [];
-                this.types = [];
+                this.drops = new Array(this.max).fill(null).map(()=>({ active: false }));
                 this.pos = new Float32Array(this.max * 3);
-                this.sizes = new Float32Array(this.max);
-                this.colors = new Float32Array(this.max * 3);
-                this.ages = new Float32Array(this.max);
+                this.size = new Float32Array(this.max);
+                this.vel = new Array(this.max).fill(null).map(()=>({ y:0, vx:0, vz:0 }));
+                this.type = new Array(this.max).fill('rain');
+                this.age = new Uint16Array(this.max);
+                this.life = new Float32Array(this.max);
+                this.quality = new Float32Array(this.max);
 
-                for (let i = 0; i < this.max; i++) {
+                for (let i=0;i<this.max;i++) {
                     if (i < oldMax && oldDrops[i] && oldDrops[i].active) {
                         const idx = i * 3;
-                        this.drops.push({ active: true });
-                        this.vel.push(oldVel[i]);
-                        this.types.push(oldTypes[i]);
+                        this.drops[i] = { active: true };
                         this.pos[idx] = oldPos[idx];
-                        this.pos[idx + 1] = oldPos[idx + 1];
-                        this.pos[idx + 2] = oldPos[idx + 2];
-                        this.sizes[i] = oldSizes[i];
-                        this.colors[idx] = oldColors[idx];
-                        this.colors[idx + 1] = oldColors[idx + 1];
-                        this.colors[idx + 2] = oldColors[idx + 2];
+                        this.pos[idx+1] = oldPos[idx+1];
+                        this.pos[idx+2] = oldPos[idx+2];
+                        this.size[i] = oldSize[i];
+                        this.vel[i] = oldVel[i] || { y:0, vx:0, vz:0 };
+                        this.type[i] = oldType[i];
+                        this.age[i] = oldAge[i];
+                        this.life[i] = oldLife[i];
+                        this.quality[i] = oldQual[i] || 1.0;
                     } else {
-                        this.drops.push({ active: false });
-                        this.vel.push({ y: 0, size: 0 });
-                        this.types.push('rain');
                         const idx = i * 3;
-                        this.pos[idx] = 0;
-                        this.pos[idx + 1] = -1000;
-                        this.pos[idx + 2] = 0;
+                        this.pos[idx] = 0; this.pos[idx+1] = -1000; this.pos[idx+2] = 0;
+                        this.size[i] = 0;
+                        this.age[i] = 0;
+                        this.life[i] = 0;
+                        this.quality[i] = 0;
                     }
                 }
 
                 this.rain.geometry.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
-                this.rain.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
-                this.rain.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+                this.rain.geometry.setAttribute('size', new THREE.BufferAttribute(this.size, 1));
                 this.rain.geometry.attributes.position.needsUpdate = true;
                 this.rain.geometry.attributes.size.needsUpdate = true;
-                this.rain.geometry.attributes.color.needsUpdate = true;
+            }
+
+            // helper: temperature-based type choice with microphysical bias
+            determinePrecipType(altitude, localTempOverride=null) {
+                const temp = this.getTemperature(altitude);
+                const t = (localTempOverride !== null) ? localTempOverride : temp;
+                if (t < -8) return 'snow';
+                if (t < -2 && altitude > 14) return 'sleet';
+                if (t < 1 && Math.random() < 0.18) return 'freezing_rain';
+                return 'rain';
             }
 
             getTemperature(altitude) {
-                const seaLevelTemp = 15;
+                // reuse earlier simple lapse in existing class
+                const seaLevelTemp = 15 + (window.DayNight ? (window.DayNight.tempOffset || 0) : 0);
                 const lapseRate = 6.5;
                 return seaLevelTemp - (altitude / 1000) * lapseRate;
             }
 
-            determinePrecipType(temperature, altitude) {
-                if (temperature < -8) {
-                    return 'snow';
-                } else if (temperature < -2 && altitude > 14) {
-                    return 'sleet';
-                } else if (temperature < 1 && Math.random() < 0.25) {
-                    return 'freezing_rain';
-                } else {
-                    return 'rain';
-                }
-            }
-
-            spawn(cloud) {
+            // spawn a single drop with microphysics-driven initial conditions based on cloud
+            spawnDropFromCloud(cloud) {
                 if (!cloud) return;
-                // Only heavy precipitation for towering cumulus, cumulonimbus, supercell.
-                // Cumulus may produce occasional light precip (low probability).
+                // bias spawn by cloud properties but allow continuous seeding for dying clouds at lower rate
                 const stage = cloud.stage || 'cumulus';
-                if (stage === 'cumulus' && Math.random() > 0.06) return; // ~6% chance for light rain from ordinary cumulus
-                if (stage === 'towering_cumulus' && Math.random() > 0.45) {
-                    // towering cumulus will sometimes produce moderate showers; let ~55% pass
-                    return;
-                }
-                const cx = cloud.x;
-                const cz = cloud.z;
-                const h = cloud.height - 1;
-                const radius = Math.max(6, cloud.radius * 0.85);
+                const stageBias = stage === 'supercell' ? 2.2 : (stage === 'cumulonimbus' ? 1.6 : (stage === 'towering_cumulus' ? 1.05 : 0.36));
+                const baseSpawnChance = Math.min(1.6, (cloud.mass / 5.5) * stageBias);
+                if (cloud.dying && Math.random() > 0.5) return; // dying clouds spawn less often
 
-                const env = sampleEnvironment(cx, cz, 0);
-                if (env.humidity < 0.35) return;
-
-                const heightFactor = Math.max(0.8, 1 + (cloud.height - 12) * 0.06);
-                const maturityFactor = Math.min(2.2, 0.6 + cloud.condensationLevel * 1.6);
-                // stage multiplier: cumulus (light) < towering_cumulus (moderate) < cumulonimbus (strong) < supercell (very strong)
-                let stageFactor = 0.35; // default for very weak sources (should rarely reach here)
-                if (stage === 'cumulus') stageFactor = 0.25;
-                else if (stage === 'towering_cumulus') stageFactor = 0.9;
-                else if (stage === 'cumulonimbus') stageFactor = 1.3;
-                else if (stage === 'supercell') stageFactor = 1.8;
-
-                // Spawn more frequently and larger drops for higher stageFactor
+                // find free slot
                 for (let i = 0; i < this.max; i++) {
                     if (!this.drops[i].active) {
                         const idx = i * 3;
+                        // position within cloud footprint with small jitter
                         const angle = Math.random() * Math.PI * 2;
-                        const r = Math.random() * radius;
-                        this.pos[idx] = cx + Math.cos(angle) * r;
-                        this.pos[idx + 1] = h;
-                        this.pos[idx + 2] = cz + Math.sin(angle) * r;
-                        
-                        const temp = this.getTemperature(h);
-                        const precipType = this.determinePrecipType(temp, h);
-                        this.types[i] = precipType;
-                        
-                        // size and speed scaled strongly by stageFactor and maturity
-                        const sizeMult = heightFactor * maturityFactor * stageFactor;
-                        let s, fallSpeed, color;
+                        const r = Math.random() * Math.max(4, cloud.radius * (0.8 + Math.random()*0.9));
+                        const cx = cloud.x + Math.cos(angle) * r + (Math.random()-0.5)*0.6;
+                        const cz = cloud.z + Math.sin(angle) * r + (Math.random()-0.5)*0.6;
+                        const startH = Math.max(1, (cloud.height || 18) - (0.2 + Math.random()*1.2));
+                        this.pos[idx] = cx;
+                        this.pos[idx+1] = startH + (Math.random()-0.5) * 0.5;
+                        this.pos[idx+2] = cz;
 
-                        if (precipType === 'snow') {
-                            s = (1.4 + Math.random() * 2.2) * sizeMult;
-                            fallSpeed = (0.08 + (s / 4) * 0.1) * (1.6 + Math.random() * 0.4);
-                            color = { r: 1.0, g: 1.0, b: 1.0 };
-                        } else if (precipType === 'sleet') {
-                            s = (0.9 + Math.random() * 1.4) * sizeMult;
-                            fallSpeed = (0.18 + (s / 3) * 0.32) * (1.7 + Math.random() * 0.3);
-                            color = { r: 0.92, g: 0.96, b: 1.0 };
-                        } else if (precipType === 'freezing_rain') {
-                            s = (0.8 + Math.random() * 2.2) * sizeMult;
-                            fallSpeed = (0.22 + (s / 3) * 0.4) * (1.8 + Math.random() * 0.4);
-                            color = { r: 0.75, g: 0.88, b: 1.0 };
+                        // determine type, microphysical quality influences size distribution
+                        const ptype = this.determinePrecipType(startH);
+                        this.type[i] = ptype;
+
+                        // quality: droplet concentration or snowflake porosity (0.5..1.8)
+                        const quality = 0.6 + Math.random() * 1.4 + Math.min(1.0, cloud.condensationLevel || 0);
+                        this.quality[i] = quality;
+
+                        // size scales with cloud mass, condensation, and stage (boosted for heavier precipitation)
+                        const massFactor = Math.max(0.7, Math.min(3.6, 0.7 + (cloud.mass || 0) * 0.14));
+                        const condFactor = 0.9 + (cloud.condensationLevel || 0) * 1.25;
+                        let s = 1.2 * massFactor * condFactor * (stageBias * (0.8 + Math.random()*1.0));
+                        // modify by type (snowflakes often larger visual but slower)
+                        let fallSpeed;
+                        if (ptype === 'snow') {
+                            s *= 1.3 + Math.random()*1.8;
+                            fallSpeed = (0.04 + (s / 5) * 0.06) * (1 + Math.random()*0.45);
+                        } else if (ptype === 'sleet') {
+                            s *= 1.0 + Math.random()*1.1;
+                            fallSpeed = (0.14 + (s / 4) * 0.2) * (1 + Math.random()*0.45);
+                        } else if (ptype === 'freezing_rain') {
+                            s *= 1.0 + Math.random()*1.8;
+                            fallSpeed = (0.18 + (s / 4) * 0.26) * (1 + Math.random()*0.45);
                         } else {
-                            // rain: make drops larger and faster for towering/cb/supercell
-                            s = (0.9 + Math.random() * 3.6) * sizeMult;
-                            fallSpeed = (0.32 + (s / 3) * 0.6) * (2.2 + Math.random() * 0.8);
-                            color = { r: 0.86, g: 0.94, b: 1.0 };
+                            // rain
+                            s *= 1.1 + Math.random()*3.2;
+                            fallSpeed = (0.32 + (s / 4) * 0.66) * (1 + Math.random()*0.45);
+                            fallSpeed *= this.params.globalSlowFactor; // apply global tuning
                         }
-                        
-                        this.vel[i] = { y: fallSpeed, size: s };
-                        // scale visual size differently for heavy precip
-                        this.sizes[i] = s * (0.22 + Math.min(0.6, stageFactor * 0.18));
-                        this.colors[idx] = color.r;
-                        this.colors[idx + 1] = color.g;
-                        this.colors[idx + 2] = color.b;
-                        this.ages[i] = 0;
+
+                        // set properties
+                        this.size[i] = Math.max(0.14, s * (0.22 + Math.min(0.7, stageBias*0.16)));
+                        this.vel[i].y = fallSpeed;
+                        // small initial horizontal vel from cloud turbulence/wind
+                        const windCell = this.windFieldRef.getAt(this.pos[idx], this.pos[idx+1], this.pos[idx+2]);
+                        this.vel[i].vx = (windCell.x || 0) * (0.7 + Math.random()*0.9) * (1 + (cloud.turbulence || 0));
+                        this.vel[i].vz = (windCell.z || 0) * (0.7 + Math.random()*0.9) * (1 + (cloud.turbulence || 0));
+                        this.age[i] = 0;
+                        this.life[i] = 1.0;
                         this.drops[i] = { active: true };
                         break;
                     }
                 }
             }
 
+            // generate splash small particles on ground impact (visual only, lightweight)
+            createSplash(x, z, normalVel) {
+                const count = Math.min(this.params.splashParticles, 8 + Math.floor(Math.random()*20));
+                const g = new THREE.BufferGeometry();
+                const arr = new Float32Array(count*3);
+                for (let i=0;i<count;i++) {
+                    arr[i*3] = x + (Math.random()-0.5)*1.2;
+                    arr[i*3+1] = 0.6 + Math.random()*1.4;
+                    arr[i*3+2] = z + (Math.random()-0.5)*1.2;
+                }
+                g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+                const mat = new THREE.PointsMaterial({ size: 0.18 + Math.random()*0.42, color: 0xcfe6ff, transparent: true, opacity: 0.95, depthWrite:false, blending: THREE.AdditiveBlending });
+                const p = new THREE.Points(g, mat);
+                p.userData = { life: 0.22 + Math.random()*0.36, vy: 0.12 + Math.abs(normalVel)*0.06 };
+                AppState.scene.add(p);
+                (this._splashPool = this._splashPool || []).push(p);
+            }
+
+            // create a pooled instanced shaft mesh for a cloud (kept but only used if enableShafts true)
+            _createInstancedShaftForCloud(cloud, intensity) {
+                // Replace instanced cone/ring geometry with a solid vertical column of points
+                // arranged along height and random-radius jitter to avoid ring banding artifacts.
+                const pcnt = 160;
+                const pGeo = new THREE.BufferGeometry();
+                const pPos = new Float32Array(pcnt * 3);
+
+                const baseHeight = Math.max(1.2, (cloud.height || 12) - 0.3);
+                const shaftRadius = Math.max(3.6, (cloud.radius || 6) * 0.9);
+
+                // Fill positions as a continuous column (no perfectly circular rings)
+                for (let pi = 0; pi < pcnt; pi++) {
+                    const frac = pi / Math.max(1, pcnt - 1);
+                    // spread vertically from near-ground up to cloud base/top fractionally
+                    const y = baseHeight * (0.06 + frac * 0.94) + (Math.sin(pi * 0.21) * 0.02); // tiny vertical jitter
+                    // use a non-uniform radial distribution with randomized angle to avoid visible ring seams
+                    const angle = (pi * 2.37 + Math.random() * 0.8) % (Math.PI * 2);
+                    const radius = (Math.random() * 0.9 + 0.1) * shaftRadius * (0.4 + 0.6 * (1 - Math.abs(0.5 - frac)));
+                    const x = cloud.x + Math.cos(angle) * radius + (Math.random() - 0.5) * 0.02;
+                    const z = cloud.z + Math.sin(angle) * radius + (Math.random() - 0.5) * 0.02;
+                    pPos[pi * 3] = x;
+                    pPos[pi * 3 + 1] = y;
+                    pPos[pi * 3 + 2] = z;
+                }
+
+                pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+
+                // Use a soft points material (depthWrite=false prevents harsh z-fighting/ring artifacts)
+                const baseCol = new THREE.Color(0x9fd8ff);
+                const pMat = new THREE.PointsMaterial({
+                    size: 0.28,
+                    color: baseCol,
+                    transparent: true,
+                    opacity: Math.min(0.55, 0.12 + intensity * 0.45) * (cloud.dying ? 0.55 : 1.0),
+                    depthWrite: false,
+                    blending: THREE.NormalBlending,
+                    sizeAttenuation: true
+                });
+
+                const points = new THREE.Points(pGeo, pMat);
+                points.userData = {
+                    cloudRef: cloud,
+                    pcnt,
+                    seed: Math.random() * 1000,
+                    baseHeight,
+                    shaftRadius
+                };
+                // avoid frustum culling so shafts near camera update reliably
+                points.frustumCulled = false;
+                return points;
+            }
+
+            // called each frame
             update() {
-                // include dying clouds as weaker precipitation sources
-                const sources = this.cloudSystemRef.getPrecipSources ? this.cloudSystemRef.getPrecipSources() : this.cloudSystemRef.getMature();
-                
-                // Track and clean up rainshafts for dead clouds
+                // gather precipitation sources
+                const sources = (this.cloudSystemRef.getPrecipSources ? this.cloudSystemRef.getPrecipSources() : this.cloudSystemRef.getMature()) || [];
+
+                // cleanup obsolete shafts
                 for (const [cloud, shaftObj] of this.cloudShafts) {
-                    if (!cloud || cloud.dying || !cloud.grp) {
+                    const shouldRemove = (!cloud) || (cloud.dying === true) || (cloud.grp == null && (cloud.age || 0) > 20);
+                    if (shouldRemove) {
                         if (shaftObj) {
-                            this.rainshaftGroup.remove(shaftObj);
-                            if (shaftObj.geometry) shaftObj.geometry.dispose();
-                            if (shaftObj.material) shaftObj.material.dispose();
+                            try { this.rainshaftGroup.remove(shaftObj.mesh || shaftObj); } catch(e) {}
+                            if (shaftObj.mesh) {
+                                shaftObj.mesh.geometry.dispose();
+                                if (shaftObj.mesh.material) shaftObj.mesh.material.dispose();
+                            } else if (shaftObj.geometry) {
+                                shaftObj.geometry.dispose();
+                                if (shaftObj.material) shaftObj.material.dispose();
+                            }
                         }
                         this.cloudShafts.delete(cloud);
                     }
                 }
 
-                if (sources.length > 0) {
-                    // Iterate sources and produce continuous precipitation proportional to cloud properties.
-                    sources.forEach((c) => {
-                        if (!c) return;
-                        // compute continuous intensity from cloud phys props (height, mass, condensation, stage)
-                        const heightFactor = Math.max(0.9, 1 + (c.height - 12) * 0.05);
-                        const maturityFactor = Math.min(2.5, 0.5 + c.condensationLevel * 2.0);
-                        let stageFactor = 0.35;
-                        if (c.stage === 'towering_cumulus') stageFactor = 0.9;
-                        else if (c.stage === 'cumulonimbus') stageFactor = 1.3;
-                        else if (c.stage === 'supercell') stageFactor = 1.9;
-                        // dying clouds contribute but much weaker
-                        const dyingFactor = c.dying ? 0.22 : 1.0;
-                        // incorporate turbulence/updraft to bias charge of droplet formation and size
-                        const turbFactor = 1 + (c.turbulence || 0) * 0.8;
-                        // final intensity 0..~2
-                        const intensity = Math.max(0, Math.min(2.2, (c.mass / 5) * maturityFactor * heightFactor * stageFactor * dyingFactor * turbFactor));
-                        
-                        // visual shaft parameters
-                        const shaftRadius = Math.max(4.5, c.radius * 0.9 * Math.sqrt(1 + c.condensationLevel * 0.6));
-                        const shaftHeight = Math.max(1.6, c.height - 0.3);
-
-                        // ensure a shaft object exists and follows the cloud (cloud dissipation will fade it)
-                        if (this.enableShafts && intensity > 0.06 && shaftHeight > 1.5) {
-                            let shaftObj = this.cloudShafts.get(c);
-                            if (!shaftObj) {
-                                const pcnt = 160;
-                                const pGeo = new THREE.BufferGeometry();
-                                const pPos = new Float32Array(pcnt * 3);
-                                for (let pi = 0; pi < pcnt; pi++) {
-                                    pPos[pi*3] = c.x;
-                                    pPos[pi*3+1] = -1000;
-                                    pPos[pi*3+2] = c.z;
-                                }
-                                pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-                                const baseCol = new THREE.Color(0xaaccff);
-                                const pMat = new THREE.PointsMaterial({
-                                    size: 0.32,
-                                    color: baseCol,
-                                    transparent: true,
-                                    opacity: Math.min(0.5, 0.18 + intensity * 0.44) * (c.dying ? 0.6 : 1.0),
-                                    depthWrite: false,
-                                    blending: THREE.NormalBlending
-                                });
-                                shaftObj = new THREE.Points(pGeo, pMat);
-                                // store deterministic seed and breathing parameters rather than relying on per-frame random fills
-                                shaftObj.userData = { life: 1.0, baseCol, offsetY: 0.0, vy: 0.003 + Math.random() * 0.006, pulse: intensity, cloudRef: c, seed: Math.random()*1000, swirl: 0.08 + Math.random()*0.18 };
-                                this.cloudShafts.set(c, shaftObj);
-                                this.rainshaftGroup.add(shaftObj);
-                            }
-                            // populate shaft in cloud-local positions so it follows cloud when cloud moves
-                            // deterministic procedural fill (time-driven) so updates remain animated and not frozen by logic
-                            const pArr = shaftObj.geometry.attributes.position.array;
-                            const pcnt = pArr.length / 3;
-                            const timePhase = performance.now() * 0.0006 + (shaftObj.userData.seed || 0);
-                            for (let pi = 0; pi < pcnt; pi++) {
-                                // banding and slow swirl provide continuous motion
-                                const band = (pi % 3);
-                                const bandFrac = band === 0 ? 0.82 : (band === 1 ? 0.48 : 0.14);
-                                const y = Math.max(0.6, bandFrac * shaftHeight) + Math.sin(timePhase + pi * 0.023) * 0.06 + (shaftObj.userData.offsetY || 0);
-                                const swirl = Math.sin(timePhase * (0.9 + band * 0.12) + pi * 0.09) * (shaftObj.userData.swirl || 0.12);
-                                const rrand = (0.65 + 0.35 * Math.sin(timePhase * 0.7 + pi * 0.031)) * shaftRadius * (0.68 + 0.48 * ((pi % 7)/7));
-                                const ang = (pi * 0.371 + swirl) % (Math.PI * 2);
-                                pArr[pi*3] = c.x + Math.cos(ang) * rrand + (Math.sin(timePhase + pi) * 0.02);
-                                pArr[pi*3+1] = y;
-                                pArr[pi*3+2] = c.z + Math.sin(ang) * rrand + (Math.cos(timePhase + pi) * 0.02);
-                            }
-                            shaftObj.geometry.attributes.position.needsUpdate = true;
-                            // keep shaft positioned at world origin (points are absolute), but store pulse for animation
-                            shaftObj.material.opacity = Math.min(0.75, 0.18 + intensity * 0.5) * (c.dying ? 0.55 : 1.0);
-                            shaftObj.userData.pulse = intensity * (1 + c.condensationLevel * 0.6);
-                            // breathing offset reacts to updraft and creates gentle continuous vertical motion
-                            const updraftLocal = (AppState.updraftSystem ? AppState.updraftSystem.getUpdraftAt(c.x, c.z) : 0);
-                            shaftObj.userData.offsetY = Math.sin(performance.now() * 0.0013 + (shaftObj.userData.seed || 0)) * (0.18 + updraftLocal * 0.8) + (shaftObj.userData.offsetY * 0.92 || 0);
-                        }
-
-                        // Continuous drop spawn: spawn count scales with intensity and cloud area.
-                        // heavier storms spawn many drops per frame, light/ dying clouds spawn only a few.
-                        const areaFactor = Math.max(0.6, (c.radius * c.horizontalSpread) / 6);
-                        // base spawn count (clamped)
-                        const spawnBase = Math.floor(Math.min(60, Math.max(1, intensity * 18 * areaFactor)));
-                        // dying clouds further reduce spawn rate
-                        const spawnMultiplier = c.dying ? (0.14 + Math.random() * 0.26) : (0.7 + Math.random() * 0.6);
-                        const totalToSpawn = Math.max(1, Math.floor(spawnBase * spawnMultiplier));
-
-                        for (let s = 0; s < totalToSpawn; s++) {
-                            this.spawn(c);
-                        }
+                // Create organized precipitation bands (mesoscale features)
+                if (!this._precipBands) this._precipBands = [];
+                this._precipBands = this._precipBands.filter(band => {
+                    band.age++;
+                    // Bands move and influence local spawn rates
+                    band.x += band.vx;
+                    band.z += band.vz;
+                    return band.age < band.maxAge;
+                });
+                if (sources.length > 2 && Math.random() < 0.002) {
+                    const avgC = sources[Math.floor(sources.length / 2)];
+                    this._precipBands.push({
+                        x: avgC.x, z: avgC.z, vx: 0.28, vz: 0.06,
+                        radius: 35 + Math.random() * 40, strength: 1.2 + Math.random() * 1.8,
+                        age: 0, maxAge: 800 + Math.random() * 600
                     });
                 }
 
-                let active = 0;
-                let streakIdx = 0;
-                const streakPos = this.streakGeometry.attributes.position.array;
-                
-                for (let i = 0; i < this.max; i++) {
-                    if (!this.drops[i].active) continue;
+                // spawn continuous precipitation with band enhancement
+                for (let ci = 0; ci < sources.length; ci++) {
+                    const c = sources[ci];
+                    if (!c) continue;
+
+                    // NEW: Wind shear influence on precipitation tilt & organization
+                    const shearMag = AppState.windShearSystem ? AppState.windShearSystem.computeShear(c.x, c.z) : 0;
+                    if (AppState.windShearSystem) AppState.windShearSystem.applyShearToCloud(c, shearMag);
+
+                    // compute intensity factors
+                    const heightFactor = Math.max(0.85, 1 + ((c.height||12) - 12) * 0.045);
+                    const maturityFactor = Math.min(2.8, 0.6 + (c.condensationLevel || 0.2) * 2.1);
+                    let stageFactor = 0.4;
+                    if (c.stage === 'towering_cumulus') stageFactor = 1.05;
+                    else if (c.stage === 'cumulonimbus') stageFactor = 1.55;
+                    else if (c.stage === 'supercell') stageFactor = 2.4;
                     
-                    const idx = i * 3;
-                    const altitude = this.pos[idx + 1];
-                    const w = this.windFieldRef.getAt(this.pos[idx], altitude, this.pos[idx + 2]);
+                    // NEW: CAPE boost (stronger updrafts in unstable atmosphere)
+                    const cape = AppState.atmosphericLayers ? AppState.atmosphericLayers.computeCALE(c.cloudBase || 8, c.height) : 0;
+                    const capeBoost = Math.min(1.5, 0.8 + (cape / 1500));
                     
-                    const oldY = altitude;
-                    
-                    let windResistance = 1.0;
-                    if (this.types[i] === 'snow') {
-                        windResistance = 3.5;
-                    } else if (this.types[i] === 'sleet') {
-                        windResistance = 1.8;
-                    } else if (this.types[i] === 'freezing_rain') {
-                        windResistance = 0.8;
+                    const dyingFactor = c.dying ? 0.26 : 1.0;
+                    const turbFactor = 1 + (c.turbulence || 0) * 0.9;
+                    let intensity = Math.max(0, Math.min(5.5, ((c.mass || 0) / 5) * maturityFactor * heightFactor * stageFactor * dyingFactor * turbFactor * capeBoost * 1.1));
+
+                    // enhance intensity if cloud is in a precipitation band
+                    for (const band of this._precipBands) {
+                        const dist = Math.hypot(c.x - band.x, c.z - band.z);
+                        if (dist < band.radius) {
+                            const boost = band.strength * (1 - dist / band.radius) * 1.3;
+                            intensity = Math.min(5.2, intensity + boost);
+                        }
                     }
-                    
-                    this.pos[idx + 1] -= this.vel[i].y;
-                    this.pos[idx] += w.x * windResistance * (0.8 / (this.vel[i].size + 0.1));
-                    this.pos[idx + 2] += w.z * windResistance * (0.8 / (this.vel[i].size + 0.1));
-                    
-                    this.ages[i]++;
-                    
-                    const currentTemp = this.getTemperature(altitude);
-                    
-                    if (this.types[i] === 'snow' && currentTemp > 3 && altitude < 8) {
-                        this.types[i] = 'rain';
-                        this.vel[i].y = 0.4 + (this.vel[i].size / 3) * 0.6;
-                        this.colors[idx] = 0.88;
-                        this.colors[idx + 1] = 0.94;
-                        this.colors[idx + 2] = 1.0;
+
+                    // spawn drops scaled by intensity (increased rates for heavy systems)
+                    const areaFactor = Math.max(0.6, ((c.radius||4) * (c.horizontalSpread||1))/5);
+                    const spawnBase = Math.floor(Math.min(180, Math.max(2, intensity * 42 * areaFactor)));
+                    const spawnMultiplier = c.dying ? (0.22 + Math.random()*0.32) : (0.75 + Math.random()*0.85);
+                    const toSpawn = Math.max(1, Math.floor(spawnBase * spawnMultiplier));
+                    for (let s=0; s<toSpawn; s++) this.spawnDropFromCloud(c);
+                }
+
+                // Advanced microphysics interactions (increased iteration count for complex dynamics)
+                for (let iter=0; iter<Math.min(240, Math.floor(this.max*0.03)); iter++) {
+                    const a = Math.floor(Math.random()*this.max);
+                    if (!this.drops[a].active) continue;
+
+                    // coalescence (droplet collision & merge)
+                    if (Math.random() < this.params.coalesceProb) {
+                        const b = Math.floor(Math.random()*this.max);
+                        if (a === b || !this.drops[b].active) continue;
+                        const ax = this.pos[a*3], ay = this.pos[a*3+1], az = this.pos[a*3+2];
+                        const bx = this.pos[b*3], by = this.pos[b*3+1], bz = this.pos[b*3+2];
+                        const dd = (ax-bx)*(ax-bx)+(ay-by)*(ay-by)+(az-bz)*(az-bz);
+                        if (dd < 0.5) {
+                            // merge: conserve volume (cube law) with growth bonus
+                            const newSize = Math.cbrt(Math.pow(this.size[a], 3) + Math.pow(this.size[b], 3)) * 1.08;
+                            this.size[a] = Math.max(this.size[a], this.size[b]) * 1.15 + newSize * 0.04;
+                            // average velocities with slight bias toward heavier drop
+                            const wA = this.size[a] / (this.size[a] + this.size[b]);
+                            this.vel[a].y = this.vel[a].y * wA + this.vel[b].y * (1 - wA);
+                            this.vel[a].vx = this.vel[a].vx * wA + this.vel[b].vx * (1 - wA);
+                            this.vel[a].vz = this.vel[a].vz * wA + this.vel[b].vz * (1 - wA);
+                            this.quality[a] = Math.max(0.35, (this.quality[a]+this.quality[b])*0.48);
+                            // kill b
+                            this.drops[b].active = false;
+                            this.pos[b*3+1] = -1000;
+                        }
                     }
-                    
-                    if (streakIdx < 300 && this.vel[i].y > 0.6 && Math.random() < 0.2 && this.types[i] !== 'snow') {
-                        const si = streakIdx * 6;
-                        streakPos[si] = this.pos[idx];
-                        streakPos[si + 1] = oldY;
-                        streakPos[si + 2] = this.pos[idx + 2];
-                        streakPos[si + 3] = this.pos[idx];
-                        streakPos[si + 4] = this.pos[idx + 1];
-                        streakPos[si + 5] = this.pos[idx + 2];
-                        streakIdx++;
+
+                    // warm-rain process: rapid coalescence in warmer clouds
+                    if (this.getTemperature(this.pos[a*3+1]) > 8 && this.size[a] > 1.2 && Math.random() < 0.008) {
+                        const b = Math.floor(Math.random()*this.max);
+                        if (a !== b && this.drops[b].active) {
+                            const ax = this.pos[a*3], ay = this.pos[a*3+1], az = this.pos[a*3+2];
+                            const bx = this.pos[b*3], by = this.pos[b*3+1], bz = this.pos[b*3+2];
+                            const dd = (ax-bx)*(ax-bx)+(ay-by)*(ay-by)+(az-bz)*(az-bz);
+                            if (dd < 0.45) {
+                                this.size[a] = Math.max(this.size[a] * 1.18, this.size[a] + this.size[b] * 0.8);
+                                this.drops[b].active = false;
+                                this.pos[b*3+1] = -1000;
+                            }
+                        }
                     }
-                    
-                    if (this.pos[idx + 1] < 0.5 || this.ages[i] > 800) {
-                        this.drops[i].active = false;
-                        this.pos[idx] = 0;
-                        this.pos[idx + 1] = -1000;
-                        this.pos[idx + 2] = 0;
-                        this.sizes[i] = 0;
-                    } else {
-                        active++;
+
+                    // ice-crystal aggregation (only for frozen precip)
+                    if ((this.type[a] === 'snow' || this.type[a] === 'sleet') && this.getTemperature(this.pos[a*3+1]) < -5 && Math.random() < 0.004) {
+                        const b = Math.floor(Math.random()*this.max);
+                        if (a !== b && this.drops[b].active && (this.type[b] === 'snow' || this.type[b] === 'sleet')) {
+                            const ax = this.pos[a*3], ay = this.pos[a*3+1], az = this.pos[a*3+2];
+                            const bx = this.pos[b*3], by = this.pos[b*3+1], bz = this.pos[b*3+2];
+                            const dd = (ax-bx)*(ax-bx)+(ay-by)*(ay-by)+(az-bz)*(az-bz);
+                            if (dd < 0.6) {
+                                this.size[a] = Math.sqrt(Math.pow(this.size[a],2) + Math.pow(this.size[b],2)) * 1.06;
+                                this.quality[a] = Math.min(1.6, this.quality[a] + this.quality[b] * 0.4);
+                                this.drops[b].active = false;
+                                this.pos[b*3+1] = -1000;
+                            }
+                        }
+                    }
+
+                    // breakup (rain fragmentation for very large drops)
+                    if (this.size[a] > 4.8 && Math.random() < this.params.breakProb) {
+                        const fragments = 2 + Math.floor(Math.random()*3);
+                        for (let f=0; f<fragments; f++) {
+                            for (let j=0;j<this.max;j++) {
+                                if (!this.drops[j].active) {
+                                    const idxFrom = a*3, idxTo = j*3;
+                                    this.drops[j].active = true;
+                                    this.pos[idxTo] = this.pos[idxFrom] + (Math.random()-0.5)*1.0;
+                                    this.pos[idxTo+1] = this.pos[idxFrom+1] + (Math.random()*0.4);
+                                    this.pos[idxTo+2] = this.pos[idxFrom+2] + (Math.random()-0.5)*1.0;
+                                    this.size[j] = this.size[a] * (0.32 + Math.random()*0.38);
+                                    this.type[j] = this.type[a];
+                                    this.vel[j].y = this.vel[a].y * (0.62 + Math.random()*0.3);
+                                    this.quality[j] = this.quality[a] * (0.5 + Math.random()*0.8);
+                                    break;
+                                }
+                            }
+                        }
+                        this.size[a] *= 0.42;
                     }
                 }
-                
-                for (let i = streakIdx * 6; i < 300 * 6; i++) {
-                    streakPos[i] = 0;
+
+                // virga: rain that evaporates before reaching ground in dry layers
+                const virgeCount = Math.floor(this.max * 0.008);
+                for (let vi = 0; vi < virgeCount; vi++) {
+                    const i = Math.floor(Math.random() * this.max);
+                    if (!this.drops[i].active) continue;
+                    const y = this.pos[i*3+1];
+                    const env = sampleEnvironment(this.pos[i*3], this.pos[i*3+2], y);
+                    // virga forms in dry air (humidity < 35%) and moderate altitude (3..10 units)
+                    if (env.humidity < 0.35 && y > 3 && y < 10 && this.size[i] < 1.2) {
+                        // rapid evaporation in dry layer
+                        this.size[i] *= (0.55 + Math.random()*0.35);
+                        if (this.size[i] < 0.12) {
+                            this.drops[i].active = false;
+                            this.pos[i*3+1] = -1000;
+                        }
+                    }
+                }
+
+                // movement, advection, wind response, environment coupling
+                let activeCount = 0;
+                let streakIdx = 0;
+                const streakPos = this.streakGeometry.attributes.position.array;
+
+                for (let i=0;i<this.max;i++) {
+                    if (!this.drops[i].active) continue;
+                    const idx = i*3;
+                    let y = this.pos[idx+1];
+                    const w = this.windFieldRef.getAt(this.pos[idx], y, this.pos[idx+2]) || { x:0, z:0 };
+
+                    // drag & aerodynamics by type & size
+                    let dragMult = 1.0;
+                    if (this.type[i] === 'snow') dragMult = 3.4;
+                    else if (this.type[i] === 'sleet') dragMult = 2.0;
+                    else if (this.type[i] === 'freezing_rain') dragMult = 0.92;
+                    else dragMult = 1.1;
+
+                    // wind advection with drag scaling
+                    const windInfluence = dragMult * (1.0 / (this.size[i] + 0.08));
+                    this.pos[idx] += (w.x * windInfluence) * 1.0 + this.vel[i].vx * 0.36;
+                    this.pos[idx+2] += (w.z * windInfluence) * 1.0 + this.vel[i].vz * 0.36;
+
+                    // vertical fall with terminal velocity
+                    this.pos[idx+1] -= this.vel[i].y;
+
+                    // updraft/downdraft interaction (read cell markers from wind field)
+                    const updraft = (AppState.updraftSystem ? AppState.updraftSystem.getUpdraftAt(this.pos[idx], this.pos[idx+2]) : 0);
+                    const windCell = this.windFieldRef.getAt(this.pos[idx], y, this.pos[idx+2]);
+                    const downburstSig = windCell && windCell.__downburst ? windCell.__downburst : 0;
+                    const vortexSig = windCell && windCell.__vortex ? windFieldRef && windFieldRef.field ? windCell.__vortex : windCell.__vortex : 0;
+                    if (updraft > 0.02) {
+                        this.pos[idx+1] += updraft * (0.04 / (0.5 + this.size[i])) * (0.9 + Math.random()*0.8);
+                    }
+                    if (downburstSig > 0.002) {
+                        // enhance downward motion in strong downburst
+                        this.vel[i].y *= (1 + downburstSig * 0.28);
+                    }
+                    if (Math.abs(vortexSig) > 0.002) {
+                        // add tangential acceleration from vortex shear
+                        const angle = Math.atan2(this.pos[idx+2], this.pos[idx]);
+                        this.vel[i].vx += Math.sin(angle + Math.PI/2) * Math.abs(vortexSig) * 0.12;
+                        this.vel[i].vz += Math.cos(angle + Math.PI/2) * Math.abs(vortexSig) * 0.12;
+                    }
+
+                    // size-dependent evaporation with humidity/temperature coupling
+                    const env = sampleEnvironment(this.pos[idx], this.pos[idx+2], y);
+                    const tempFactor = 1 - Math.min(1, Math.max(-5, this.getTemperature(y) + 15) / 35);
+                    const humidityFactor = Math.max(0, env.humidity - 0.7);
+                    const evap = this.params.evaporationRate * tempFactor * (1 - humidityFactor * 0.8) * (1.2 - Math.min(1.8, this.quality[i] || 1.0)) * (1 + (this.size[i] < 0.6 ? 1.3 : 0));
+                    this.size[i] -= evap;
+                    if (this.size[i] <= 0.08) {
+                        this.drops[i].active = false;
+                        this.pos[idx+1] = -1000;
+                        continue;
+                    }
+
+                    // phase transitions
+                    const currentTemp = this.getTemperature(y);
+                    if (this.type[i] === 'snow' && currentTemp > 2.8 && y < 6) {
+                        this.type[i] = 'rain';
+                        this.vel[i].y = Math.max(0.24, this.vel[i].y * 0.70) * this.params.globalSlowFactor;
+                    } else if (this.type[i] === 'sleet' && currentTemp > 4 && y < 8) {
+                        this.type[i] = 'rain';
+                        this.vel[i].y = Math.max(0.20, this.vel[i].y * 0.68) * this.params.globalSlowFactor;
+                    }
+
+                    // streaks (fast large drops)
+                    if (streakIdx < 400 && this.vel[i].y > 0.92 && this.type[i] === 'rain' && this.size[i] > 0.8 && Math.random() < 0.20) {
+                        const si = streakIdx * 6;
+                        streakPos[si] = this.pos[idx];
+                        streakPos[si+1] = y;
+                        streakPos[si+2] = this.pos[idx+2];
+                        streakPos[si+3] = this.pos[idx];
+                        streakPos[si+4] = this.pos[idx+1];
+                        streakPos[si+5] = this.pos[idx+2];
+                        streakIdx++;
+                    }
+
+                    // ground collision & splashes
+                    if (this.pos[idx+1] < 0.6 || this.age[i] > 2000) {
+                        if (this.size[i] > 0.6 && Math.random() < Math.min(0.98, this.size[i]*0.45)) {
+                            this.createSplash(this.pos[idx], this.pos[idx+2], this.vel[i].y);
+                        }
+                        this.drops[i].active = false;
+                        this.pos[idx] = 0; this.pos[idx+1] = -1000; this.pos[idx+2] = 0;
+                        this.size[i] = 0;
+                        continue;
+                    }
+
+                    this.age[i]++;
+                    this.life[i] = Math.max(0, 1 - this.age[i]/2200);
+
+                    activeCount++;
+                }
+
+                // clear unused streak slots
+                for (let k = streakIdx*6; k < 400*6; k++) streakPos[k] = 0;
+
+                // animate & cleanup splash particles
+                if (this._splashPool && this._splashPool.length) {
+                    for (let i = this._splashPool.length - 1; i >= 0; i--) {
+                        const p = this._splashPool[i];
+                        if (!p) { this._splashPool.splice(i,1); continue; }
+                        p.userData.life -= 0.015;
+                        p.material.opacity = Math.max(0, p.material.opacity - 0.035);
+                        const posAttr = p.geometry.attributes.position;
+                        const arr = posAttr.array;
+                        for (let j=0;j<arr.length;j+=3) {
+                            arr[j+1] += (p.userData.vy || 0) * 0.24;
+                            arr[j] += (Math.random()-0.5)*0.04;
+                            arr[j+2] += (Math.random()-0.5)*0.04;
+                        }
+                        p.geometry.attributes.position.needsUpdate = true;
+                        if (p.userData.life <= 0) {
+                            AppState.scene.remove(p);
+                            if (p.geometry) p.geometry.dispose();
+                            if (p.material) p.material.dispose();
+                            this._splashPool.splice(i,1);
+                        }
+                    }
                 }
 
                 this.rain.geometry.attributes.position.needsUpdate = true;
                 this.rain.geometry.attributes.size.needsUpdate = true;
-                this.rain.geometry.attributes.color.needsUpdate = true;
                 this.streakGeometry.attributes.position.needsUpdate = true;
-                return active;
+
+                return activeCount;
             }
+        }
+
+        // Fallback/patch: ensure Precipitation has _createInstancedShaftForCloud method at runtime
+        if (typeof Precipitation !== 'undefined' && !Precipitation.prototype._createInstancedShaftForCloud) {
+            Precipitation.prototype._createInstancedShaftForCloud = function(cloud, intensity) {
+                // Lightweight soft-point shaft to avoid missing function errors and visual ring artifacts
+                const pcnt = 120;
+                const pGeo = new THREE.BufferGeometry();
+                const pPos = new Float32Array(pcnt * 3);
+
+                const baseHeight = Math.max(1.2, (cloud.height || 12) - 0.3);
+                const shaftRadius = Math.max(3.6, (cloud.radius || 6) * 0.9);
+
+                for (let pi = 0; pi < pcnt; pi++) {
+                    const frac = pi / Math.max(1, pcnt - 1);
+                    const y = baseHeight * (0.06 + frac * 0.94) + (Math.sin(pi * 0.21) * 0.02);
+                    const angle = (pi * 2.37 + Math.random() * 0.8) % (Math.PI * 2);
+                    const radius = (Math.random() * 0.9 + 0.1) * shaftRadius * (0.4 + 0.6 * (1 - Math.abs(0.5 - frac)));
+                    const x = cloud.x + Math.cos(angle) * radius + (Math.random() - 0.5) * 0.02;
+                    const z = cloud.z + Math.sin(angle) * radius + (Math.random() - 0.5) * 0.02;
+                    pPos[pi * 3] = x;
+                    pPos[pi * 3 + 1] = y;
+                    pPos[pi * 3 + 2] = z;
+                }
+
+                pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+                const pMat = new THREE.PointsMaterial({
+                    size: 0.28,
+                    color: new THREE.Color(0x9fd8ff),
+                    transparent: true,
+                    opacity: Math.min(0.55, 0.12 + intensity * 0.45) * (cloud.dying ? 0.55 : 1.0),
+                    depthWrite: false,
+                    blending: THREE.NormalBlending,
+                    sizeAttenuation: true
+                });
+
+                const points = new THREE.Points(pGeo, pMat);
+                points.userData = { cloudRef: cloud, pcnt, baseHeight, shaftRadius, seed: Math.random() * 1000 };
+                points.frustumCulled = false;
+                return points;
+            };
         }
 
         class Lightning {
@@ -1811,20 +2139,8 @@
                 AppState.scene.add(glow);
                 this.bolts.push(glow);
 
-                // subtle corona points along path to simulate plasma beads / return-stroke brightness
-                const pts = new THREE.BufferGeometry();
-                const ptArr = new Float32Array(mainPath.length * 3);
-                for (let i = 0; i < mainPath.length; i++) {
-                    ptArr[i*3] = mainPath[i].x + (Math.random()-0.5)*0.6;
-                    ptArr[i*3+1] = mainPath[i].y + (Math.random()-0.5)*0.6;
-                    ptArr[i*3+2] = mainPath[i].z + (Math.random()-0.5)*0.6;
-                }
-                pts.setAttribute('position', new THREE.BufferAttribute(ptArr, 3));
-                const beadMat = new THREE.PointsMaterial({ size: 1.6, color: 0xeefcff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
-                const beads = new THREE.Points(pts, beadMat);
-                beads.userData.life = 0.65;
-                AppState.scene.add(beads);
-                this.bolts.push(beads);
+                // remove sparkle "beads" points - replaced by subtle glow only (avoid bright white dots)
+                // (previous bead points creation removed to eliminate distracting white dots)
 
                 // Create complex branching from multiple points with variable depth & jittered directions
                 const sampleCount = Math.max(3, Math.floor(mainPath.length * 0.18));
@@ -1845,20 +2161,22 @@
                         }
                         if (glow && glow.material) glow.material.opacity = Math.min(1.0, glow.material.opacity + 0.35);
                         // emit some transient sparks (tiny particles) near the bottom of the bolt
+                        // reduced and softened spark approach: lightweight translucent points (not bright white beads)
                         const sparkGeo = new THREE.BufferGeometry();
-                        const sc = 28 + Math.floor(Math.random() * 24);
+                        const sc = 12 + Math.floor(Math.random() * 18);
                         const sPos = new Float32Array(sc * 3);
                         for (let si = 0; si < sc; si++) {
                             const t = Math.random();
                             const pt = mainPath[Math.floor(t * (mainPath.length-1))];
-                            sPos[si*3] = pt.x + (Math.random()-0.5) * 3.2;
-                            sPos[si*3+1] = pt.y + (Math.random()-0.5) * 2.2;
-                            sPos[si*3+2] = pt.z + (Math.random()-0.5) * 3.2;
+                            sPos[si*3] = pt.x + (Math.random()-0.5) * 1.6;
+                            sPos[si*3+1] = pt.y + (Math.random()-0.5) * 1.2;
+                            sPos[si*3+2] = pt.z + (Math.random()-0.5) * 1.6;
                         }
                         sparkGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-                        const sparkMat = new THREE.PointsMaterial({ size: 0.9, color: 0xfff9f3, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
+                        // softer spark color and lower opacity to avoid white dots
+                        const sparkMat = new THREE.PointsMaterial({ size: 0.6, color: 0x9fdcff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending });
                         const sparks = new THREE.Points(sparkGeo, sparkMat);
-                        sparks.userData = { life: 0.28 + Math.random() * 0.24 };
+                        sparks.userData = { life: 0.18 + Math.random() * 0.22 };
                         AppState.scene.add(sparks);
                         this.bolts.push(sparks);
                         setTimeout(() => {
@@ -1895,23 +2213,39 @@
                 const sx = c.x + (Math.random() - 0.5) * 10;
                 const sz = c.z + (Math.random() - 0.5) * 10;
                 
-                // decide pulse count (2..4) biased by cloud intensity
+                // bias strikes to form hot-spots: 60% chance to re-strike near last strike location
+                if (this.lastStrikeLocation && Math.random() < 0.6) {
+                    const dx = (Math.random() - 0.5) * 35;
+                    const dz = (Math.random() - 0.5) * 35;
+                    this.lastStrikeLocation.x += dx;
+                    this.lastStrikeLocation.z += dz;
+                } else {
+                    this.lastStrikeLocation = { x: sx, z: sz };
+                }
+                
+                const strikeX = this.lastStrikeLocation.x;
+                const strikeZ = this.lastStrikeLocation.z;
+                
+                // decide pulse count
                 const basePulse = (c.mass > 7 || c.stage === 'supercell') ? 3 : 2;
                 const pulseCount = basePulse + Math.floor(Math.random() * 2);
 
-                // Cloud-to-ground strike(s) using pulseStrike
+                // Ground-to-cloud pulsing
                 this.pulseStrike(
-                    sx, c.height + 5, sz,
-                    sx + (Math.random() - 0.5) * 25, 0.5, sz + (Math.random() - 0.5) * 25,
+                    strikeX, c.height + 5, strikeZ,
+                    strikeX + (Math.random() - 0.5) * 25, 0.5, strikeZ + (Math.random() - 0.5) * 25,
                     pulseCount,
                     90
                 );
                 
-                // Occasional cloud-to-cloud pulsing
+                // Create explosion effect at strike location
+                this.createExplosion(strikeX, 0.5, strikeZ, c.height + 5, pulseCount);
+                
+                // Occasional cloud-to-cloud
                 if (Math.random() > 0.6 && mature.length > 1) {
                     const c2 = mature[Math.floor(Math.random() * mature.length)];
                     this.pulseStrike(
-                        sx, c.height + 3, sz,
+                        strikeX, c.height + 3, strikeZ,
                         c2.x + (Math.random() - 0.5) * 8, c2.height + 2, c2.z + (Math.random() - 0.5) * 8,
                         Math.max(2, Math.floor(pulseCount / 1.5)),
                         110
@@ -1919,21 +2253,132 @@
                 }
                 
                 this.flash.intensity = 35;
-                this.flash.position.set(sx, c.height, sz);
+                this.flash.position.set(strikeX, c.height, strikeZ);
                 this.count++;
                 this.last = performance.now();
                 
-                // Distance-based camera shake: scale by how close camera is to strike
+                // Distance-based camera shake
                 const cam = AppState.camera.position;
-                const dist = Math.sqrt((sx - cam.x)**2 + (c.height - cam.y)**2 + (sz - cam.z)**2);
+                const dist = Math.sqrt((strikeX - cam.x)**2 + (c.height - cam.y)**2 + (strikeZ - cam.z)**2);
                 const maxDist = 150;
-                const proximity = Math.max(0, 1 - dist / maxDist); // 0..1
-                const baseIntensity = 0.5 + proximity * 4.0; // scales from 0.5 to 4.5 depending on distance
+                const proximity = Math.max(0, 1 - dist / maxDist);
+                const baseIntensity = 0.5 + proximity * 4.0;
                 
                 const s = 1.2 + baseIntensity * 2.5;
                 AppState.cameraControls.shake.intensity = Math.max(AppState.cameraControls.shake.intensity, s);
                 AppState.cameraControls.shake.duration = Math.max(AppState.cameraControls.shake.duration, 600);
                 AppState.cameraControls.shake.time = 0;
+            }
+
+            createExplosion(x, y, z, cloudHeight, intensity = 1) {
+                // Radial shockwave ring
+                const ringGeo = new THREE.RingGeometry(0.4, 4.2, 32);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xffee88,
+                    transparent: true,
+                    opacity: 0.8 * intensity,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.position.set(x, y + 0.8, z);
+                ring.rotation.x = Math.PI / 2;
+                ring.userData = { life: 0.24, maxLife: 0.24, maxScale: 18 + intensity * 8 };
+                AppState.scene.add(ring);
+                this.bolts.push(ring);
+
+                // Explosion particles (fast radial burst)
+                const expGeo = new THREE.BufferGeometry();
+                const pcount = 80 + Math.floor(intensity * 40);
+                const epos = new Float32Array(pcount * 3);
+                const evel = new Float32Array(pcount * 3);
+                for (let i = 0; i < pcount; i++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const elev = (Math.random() - 0.3) * Math.PI * 0.5;
+                    const r = Math.random() * 2.2;
+                    epos[i*3] = x + Math.cos(ang) * r;
+                    epos[i*3+1] = y + Math.random() * 2.6;
+                    epos[i*3+2] = z + Math.sin(ang) * r;
+                    const speed = 0.8 + Math.random() * (1.6 * intensity);
+                    evel[i*3] = Math.cos(ang) * Math.cos(elev) * speed;
+                    evel[i*3+1] = Math.sin(elev) * speed * (1.2 + Math.random() * 0.8);
+                    evel[i*3+2] = Math.sin(ang) * Math.cos(elev) * speed;
+                }
+                expGeo.setAttribute('position', new THREE.BufferAttribute(epos, 3));
+                expGeo.setAttribute('velocity', new THREE.BufferAttribute(evel, 3));
+                const expMat = new THREE.PointsMaterial({
+                    size: 0.32 + intensity * 0.18,
+                    color: 0xffdd88,
+                    transparent: true,
+                    opacity: 0.95,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    sizeAttenuation: true
+                });
+                const exp = new THREE.Points(expGeo, expMat);
+                exp.userData = { life: 0.35 + intensity * 0.15, vel: evel, gravity: 0.12 };
+                AppState.scene.add(exp);
+                this.bolts.push(exp);
+
+                // Lightning upstrike to cloud (thin bright column)
+                const upstrike = new THREE.BufferGeometry();
+                const upPts = [];
+                const steps = 12 + Math.floor(intensity * 6);
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    const chaosX = (Math.random() - 0.5) * (1 + t * 2);
+                    const chaosZ = (Math.random() - 0.5) * (1 + t * 2);
+                    upPts.push(new THREE.Vector3(
+                        x + chaosX,
+                        y + t * cloudHeight,
+                        z + chaosZ
+                    ));
+                }
+                upstrike.setFromPoints(upPts);
+                const upMat = new THREE.LineBasicMaterial({
+                    color: 0xffffcc,
+                    transparent: true,
+                    opacity: 0.95 * intensity,
+                    linewidth: 2
+                });
+                const upLine = new THREE.Line(upstrike, upMat);
+                upLine.userData = { life: 0.26, isExplosion: true };
+                AppState.scene.add(upLine);
+                this.bolts.push(upLine);
+
+                // Shock wave ground effect: crater radial dust
+                if (Math.random() < 0.7) {
+                    const dustGeo = new THREE.BufferGeometry();
+                    const dustCnt = 60 + Math.floor(intensity * 30);
+                    const dpos = new Float32Array(dustCnt * 3);
+                    for (let i = 0; i < dustCnt; i++) {
+                        const a = Math.random() * Math.PI * 2;
+                        const r = Math.random() * (3 + intensity * 2);
+                        dpos[i*3] = x + Math.cos(a) * r;
+                        dpos[i*3+1] = y + (Math.random() - 0.5) * 0.4 + 0.5;
+                        dpos[i*3+2] = z + Math.sin(a) * r;
+                    }
+                    dustGeo.setAttribute('position', new THREE.BufferAttribute(dpos, 3));
+                    const dustMat = new THREE.PointsMaterial({
+                        size: 0.18 + Math.random() * 0.32,
+                        color: 0xccbbaa,
+                        transparent: true,
+                        opacity: 0.65,
+                        depthWrite: false,
+                        blending: THREE.NormalBlending,
+                        sizeAttenuation: true
+                    });
+                    const dust = new THREE.Points(dustGeo, dustMat);
+                    dust.userData = { life: 0.4, isExplosion: true };
+                    AppState.scene.add(dust);
+                    this.bolts.push(dust);
+                }
+
+                // Add intense downburst gust at strike location
+                if (AppState.downburstSystem) {
+                    AppState.downburstSystem.trigger(x, z, 8 + intensity * 4, 16 + intensity * 8, 140 + Math.floor(intensity * 60));
+                }
             }
 
             update(t) {
@@ -2505,50 +2950,50 @@
                 const existing = this.tornadoes.find(t => t.cloud === cloud);
                 if (existing) return;
 
+                // make tornados fewer but stronger and longer-lived
                 const baseRadius = 3.5 + Math.random() * 3.0;
                 const topRadius = 0.6 + Math.random() * 0.6;
-                // make funnel height tied to cloud base/top so it anchors correctly
-                const height = Math.max(18, cloud.cloudTop - cloud.cloudBase + 4);
-                const segs = 24;
+                const height = Math.max(20, cloud.cloudTop - cloud.cloudBase + 6);
+                const segs = 20;
 
+                // invisible funnel mesh retained for spatial anchoring (not rendered)
                 const funnelGeo = new THREE.CylinderGeometry(topRadius, baseRadius, height, segs, 1, true);
                 funnelGeo.translate(0, height * 0.5, 0);
-
                 const funnelMat = new THREE.MeshStandardMaterial({
                     color: new THREE.Color(0x8690a0),
                     transparent: true,
-                    opacity: 0.0, // keep mesh invisible; visuals from debris & particle column
+                    opacity: 0.0,
                     metalness: 0.05,
                     roughness: 0.85,
                     side: THREE.DoubleSide,
                     depthWrite: false
                 });
-
                 const funnel = new THREE.Mesh(funnelGeo, funnelMat);
                 funnel.castShadow = false;
                 funnel.receiveShadow = false;
                 funnel.visible = false;
 
-                const coreLight = new THREE.PointLight(0xaad0ff, 1.2, Math.max(30, height * 1.2), 2);
+                // tighter core light
+                const coreLight = new THREE.PointLight(0x9fd6ff, 0.9, Math.max(28, height * 0.9), 2);
                 coreLight.position.set(0, height * 0.45, 0);
 
-                // more detailed debris/column particles with height-proportional distribution and variable spiral speeds
-                const debrisCount = 500;
+                // reduced but better-organized debris so CPU stays reasonable — particles are taller and spiral coherently
+                const debrisCount = 220; // fewer particles but higher coherence
                 const dGeo = new THREE.BufferGeometry();
                 const dPos = new Float32Array(debrisCount * 3);
                 const dVel = new Float32Array(debrisCount * 3);
-                const dPhase = new Float32Array(debrisCount); // phase per particle so spiral isn't uniform
+                const dPhase = new Float32Array(debrisCount);
                 for (let i = 0; i < debrisCount; i++) {
                     const hFrac = Math.random();
-                    const radialBias = 0.3 + (1 - hFrac) * 0.7;
-                    const r = radialBias * baseRadius * (0.3 + Math.random() * 0.9);
+                    const radialBias = 0.25 + (1 - hFrac) * 0.75;
+                    const r = radialBias * baseRadius * (0.2 + Math.random() * 1.2);
                     const ang = Math.random() * Math.PI * 2;
                     dPos[i*3] = Math.cos(ang) * r;
-                    dPos[i*3+1] = 0.5 + hFrac * height;
+                    dPos[i*3+1] = 0.6 + hFrac * height;
                     dPos[i*3+2] = Math.sin(ang) * r;
-                    // velocities tuned so upper particles have stronger tangential motion and slower fall
-                    const tangential = 0.02 + (1 - hFrac) * 0.12;
-                    const downward = 0.006 + hFrac * 0.04;
+                    // tangential velocity larger aloft for a coherent spiral, downward modest
+                    const tangential = 0.03 + (1 - hFrac) * 0.16;
+                    const downward = 0.008 + hFrac * 0.035;
                     dVel[i*3] = -Math.sin(ang) * tangential;
                     dVel[i*3+1] = -downward;
                     dVel[i*3+2] = Math.cos(ang) * tangential;
@@ -2558,10 +3003,10 @@
                 dGeo.setAttribute('velocity', new THREE.BufferAttribute(dVel, 3));
                 dGeo.setAttribute('phase', new THREE.BufferAttribute(dPhase, 1));
                 const dMat = new THREE.PointsMaterial({
-                    size: 0.45,
+                    size: 0.42,
                     color: 0x9fd5ff,
                     transparent: true,
-                    opacity: 0.95,
+                    opacity: 0.9,
                     depthWrite: false,
                     blending: THREE.AdditiveBlending,
                     sizeAttenuation: true
@@ -2583,52 +3028,61 @@
                     baseRadius,
                     topRadius,
                     height,
-                    life: 700 + Math.random() * 400,
-                    maxLife: 700 + Math.random() * 400,
-                    strength: 10 + Math.random() * 10,
-                    spinSign: Math.random() > 0.5 ? 1 : -1
+                    life: 1200 + Math.random() * 1200, // longer-lived
+                    maxLife: 1200 + Math.random() * 1200,
+                    strength: 12 + Math.random() * 14, // stronger influence on wind
+                    spinSign: Math.random() > 0.5 ? 1 : -1,
+                    cohesion: 0.85 + Math.random() * 0.25 // keeps debris organized
                 };
 
                 this.tornadoes.push(tornado);
 
-                // camera shake on tornado birth
-                AppState.cameraControls.shake.intensity = Math.max(AppState.cameraControls.shake.intensity, 1.3);
-                AppState.cameraControls.shake.duration = 800;
+                // meaningful camera shake on tornado birth
+                AppState.cameraControls.shake.intensity = Math.max(AppState.cameraControls.shake.intensity, 1.6);
+                AppState.cameraControls.shake.duration = 1200;
                 AppState.cameraControls.shake.time = 0;
             }
 
             applyToWind(tornado) {
                 const size = this.windField.size;
                 const spacing = this.windField.spacing;
-                const rMax = tornado.baseRadius * 3.3;
+                // expand influence radius relative to baseRadius but cap for stability
+                const rMax = Math.min(160, tornado.baseRadius * 5.0);
                 const x0 = tornado.obj.position.x;
                 const z0 = tornado.obj.position.z;
+                const strength = tornado.strength;
 
+                // apply a two-part effect: strong rotational core + moderate inflow/outflow further out
                 for (let gx = 0; gx < size; gx++) {
-                    for (let gz = 0; gz < size; gz++) {
-                        const wx = (gx - size / 2) * spacing;
-                        const wz = (gz - size / 2) * spacing;
-                        const dx = wx - x0;
-                        const dz = wz - z0;
-                        const dist = Math.sqrt(dx*dx + dz*dz);
-                        if (dist > rMax || dist < 0.001) continue;
+                    for (let gy = 0; gy < Math.min(size, 10); gy++) {
+                        for (let gz = 0; gz < size; gz++) {
+                            const wx = (gx - size / 2) * spacing;
+                            const wz = (gz - size / 2) * spacing;
+                            const dx = wx - x0;
+                            const dz = wz - z0;
+                            const dist = Math.hypot(dx, dz);
+                            if (dist > rMax || dist < 0.001) continue;
 
-                        const inv = 1 / dist;
-                        const ux = dx * inv;
-                        const uz = dz * inv;
-                        const tx = -uz;
-                        const tz = ux;
+                            const inv = 1 / (dist + 0.0001);
+                            const ux = dx * inv;
+                            const uz = dz * inv;
+                            const tx = -uz;
+                            const tz = ux;
 
-                        const core = 1 - Math.min(1, dist / rMax);
-                        const inflow = tornado.strength * 1.2 * core;
-                        const spin = tornado.strength * 0.9 * core * tornado.spinSign;
+                            // core falloff sharper: strong near center, weaker outward
+                            const core = Math.max(0, 1 - (dist / rMax) ** 1.4);
+                            // rotational torque and vertical updraft marker scaled by gy (stronger aloft)
+                            const verticalFactor = 1 + (gy / Math.max(1, Math.min(12, size))) * 1.6;
+                            const inflow = strength * 0.9 * core * 0.9;
+                            const spin = strength * 1.1 * core * tornado.spinSign * (0.8 + tornado.cohesion * 0.4);
 
-                        for (let gy = 0; gy < Math.min(this.windField.size, 10); gy++) {
                             const cell = this.windField.field[gx][gy][gz];
-                            cell.x += (-ux * inflow + tx * spin) * 0.12;
-                            cell.z += (-uz * inflow + tz * spin) * 0.12;
-                            // vertical marker for intense updraft
-                            cell.__updraft = (cell.__updraft || 0) + core * 0.12;
+                            cell.x += (-ux * inflow + tx * spin) * 0.16 * verticalFactor;
+                            cell.z += (-uz * inflow + tz * spin) * 0.16 * verticalFactor;
+                            // create a stronger upward marker for convective coupling
+                            cell.__updraft = (cell.__updraft || 0) + core * 0.18 * verticalFactor;
+                            // inject vorticity signature for precipitation coupling & visual systems
+                            cell.__vortex = (cell.__vortex || 0) + spin * 0.008 * (1 + (10 - gy) * 0.04);
                         }
                     }
                 }
@@ -2642,10 +3096,10 @@
                 // look for supercell clouds and occasionally spawn tornadoes
                 if (this.cooldown === 0) {
                     const candidates = this.cloudSystem.clouds.filter(c => c.stage === 'supercell' && !c.dying && c.mass > 7);
-                    if (candidates.length > 0 && Math.random() < 0.005) {
+                    if (candidates.length > 0 && Math.random() < 0.0045) {
                         const c = candidates[Math.floor(Math.random() * candidates.length)];
                         this.spawnFromCloud(c);
-                        this.cooldown = 1200 + Math.floor(Math.random() * 800);
+                        this.cooldown = 1400 + Math.floor(Math.random() * 900);
                     }
                 }
 
@@ -2653,24 +3107,27 @@
                     const tno = this.tornadoes[i];
                     const cloud = tno.cloud;
 
-                    // follow parent cloud slowly
+                    // follow parent cloud with a tighter leash
                     if (cloud && !cloud.dying) {
                         const targetX = cloud.x;
                         const targetZ = cloud.z;
-                        tno.obj.position.x += (targetX - tno.obj.position.x) * 0.06;
-                        tno.obj.position.z += (targetZ - tno.obj.position.z) * 0.06;
-                        // adjust funnel height with cloud base/top
+                        tno.obj.position.x += (targetX - tno.obj.position.x) * 0.08;
+                        tno.obj.position.z += (targetZ - tno.obj.position.z) * 0.08;
+                        // smoothly adapt funnel height with cloud base/top
                         const newHeight = Math.max(18, cloud.cloudBase + 8);
                         if (Math.abs(newHeight - tno.height) > 0.5) {
-                            tno.height += (newHeight - tno.height) * 0.15;
-                            tno.funnel.scale.y = tno.height / Math.max(1, tno.funnel.geometry.parameters.height || tno.height);
+                            tno.height += (newHeight - tno.height) * 0.12;
+                            if (tno.funnel && tno.funnel.geometry && tno.funnel.geometry.parameters) {
+                                // keep funnel geometry but do not reallocate often
+                                // small visual scaling handled via debris positions below
+                            }
                         }
                     }
 
-                    // spin funnel
-                    tno.obj.rotation.y += 0.04 * tno.spinSign;
+                    // spin the container for coherent debris rotation
+                    tno.obj.rotation.y += 0.035 * tno.spinSign;
 
-                    // update debris (blue particles slowly falling)
+                    // update debris positions: make spiral tighter and preserve coherence using the cohesion factor
                     const posAttr = tno.debris.geometry.attributes.position;
                     const velAttr = tno.debris.geometry.attributes.velocity;
                     const p = posAttr.array;
@@ -2678,43 +3135,68 @@
                     const count = p.length / 3;
                     for (let j = 0; j < count; j++) {
                         const idx = j * 3;
-                        p[idx]     += v[idx]     * 1.0;
-                        p[idx + 1] += v[idx + 1] * 1.0;
-                        p[idx + 2] += v[idx + 2] * 1.0;
+                        // advance by velocity but damp to keep spiral structure
+                        p[idx]     += v[idx] * (0.98 + Math.random() * 0.04) * (0.9 + (1 - tno.cohesion) * 0.25);
+                        p[idx + 1] += v[idx + 1] * (0.98 + Math.random() * 0.03);
+                        p[idx + 2] += v[idx + 2] * (0.98 + Math.random() * 0.04) * (0.9 + (1 - tno.cohesion) * 0.25);
 
-                        // spiral and reset once near ground
+                        // compute current radius and gently pull toward the coherent spiral radius
                         const r = Math.sqrt(p[idx]*p[idx] + p[idx+2]*p[idx+2]) + 0.0001;
-                        const ang = Math.atan2(p[idx+2], p[idx]) + 0.1 * tno.spinSign;
-                        const baseR = Math.min(tno.baseRadius * 1.2, r + 0.02);
-                        p[idx] = Math.cos(ang) * baseR;
-                        p[idx+2] = Math.sin(ang) * baseR;
+                        const ang = Math.atan2(p[idx+2], p[idx]) + 0.095 * tno.spinSign * (0.9 + tno.cohesion * 0.18);
+                        const baseR = Math.min(tno.baseRadius * 1.25, r + 0.02 * (1 + tno.cohesion));
+                        // relax radial position toward baseR to reduce spread
+                        p[idx] = Math.cos(ang) * (baseR * (0.85 + 0.15 * Math.random()));
+                        p[idx+2] = Math.sin(ang) * (baseR * (0.85 + 0.15 * Math.random()));
 
+                        // respawn particles that drop below ground
                         if (p[idx+1] < 0.6) {
-                            // respawn higher up
-                            const nr = Math.random() * tno.baseRadius * 0.9;
+                            const hFrac = Math.random();
+                            const nr = (0.3 + (1 - hFrac) * 0.7) * tno.baseRadius * (0.4 + Math.random() * 0.6);
                             const nang = Math.random() * Math.PI * 2;
                             p[idx] = Math.cos(nang) * nr;
-                            p[idx+1] = 2 + Math.random() * (tno.height * 0.9);
+                            p[idx+1] = 0.8 + hFrac * tno.height;
                             p[idx+2] = Math.sin(nang) * nr;
+                            // refresh velocity to preserve coherent swirl upward
+                            v[idx] = -Math.sin(nang) * (0.03 + Math.random() * 0.12);
+                            v[idx+1] = -(0.008 + Math.random() * 0.04);
+                            v[idx+2] = Math.cos(nang) * (0.03 + Math.random() * 0.12);
                         }
                     }
                     posAttr.needsUpdate = true;
 
-                    // apply wind influence
+                    // apply stronger wind interaction
                     this.applyToWind(tno);
 
-                    // fade over lifetime
+                    // camera shake when close: make pulses more deliberate
+                    const cam = AppState.camera.position;
+                    const dx = cam.x - tno.obj.position.x;
+                    const dz = cam.z - tno.obj.position.z;
+                    const dist = Math.sqrt(dx*dx + dz*dz);
+                    const maxDist = 160;
+                    if (dist < maxDist) {
+                        const proximity = 1 - dist / maxDist; // 0..1
+                        const baseIntensity = 0.3 + proximity * 2.2;
+                        if (Math.random() < 0.16) {
+                            const shake = AppState.cameraControls.shake;
+                            shake.intensity = Math.max(shake.intensity, baseIntensity);
+                            shake.duration = Math.max(shake.duration, 420);
+                            shake.time = 0;
+                        }
+                    }
+
+                    // lifetime decay and fade debris opacity
                     tno.life--;
                     const lifeFrac = Math.max(0, tno.life / tno.maxLife);
-                    tno.funnel.material.opacity = 0.2 + lifeFrac * 0.5;
-                    tno.debris.material.opacity = 0.3 + lifeFrac * 0.6;
+                    tno.debris.material.opacity = 0.25 + lifeFrac * 0.7;
 
                     if (tno.life <= 0 || (cloud && cloud.dying)) {
                         this.group.remove(tno.obj);
-                        tno.funnel.geometry.dispose();
-                        tno.funnel.material.dispose();
-                        tno.debris.geometry.dispose();
-                        tno.debris.material.dispose();
+                        if (tno.funnel) {
+                            try { tno.funnel.geometry.dispose(); } catch(e) {}
+                            try { tno.funnel.material.dispose(); } catch(e) {}
+                        }
+                        try { tno.debris.geometry.dispose(); } catch(e) {}
+                        try { tno.debris.material.dispose(); } catch(e) {}
                         this.tornadoes.splice(i, 1);
                     }
                 }
@@ -3082,7 +3564,8 @@
             });
 
             // Keyboard controls for FPS movement and GUI
-            const keys = {};
+            // reuse the global keys object so animate() can access keyboard state
+            const keys = window.keys;
             window.addEventListener('keydown', e => {
                 keys[e.key.toLowerCase()] = true;
 
@@ -3170,6 +3653,375 @@
                     }
                 });
             })();
+        }
+
+        // ATMOSPHERIC LAYERS SYSTEM: Models temperature, pressure, and environmental properties at different altitudes
+        class AtmosphericLayers {
+            constructor() {
+                this.layers = [
+                    { altitude: 0, name: 'surface', tempBase: 15, tempLapse: -6.5, humidityBase: 0.7, pressureKPa: 101.325 },
+                    { altitude: 2, name: 'boundary', tempBase: 12, tempLapse: -5.8, humidityBase: 0.65, pressureKPa: 79.5 },
+                    { altitude: 6, name: 'lower-tropos', tempBase: 3, tempLapse: -6.2, humidityBase: 0.55, pressureKPa: 48.2 },
+                    { altitude: 12, name: 'mid-tropos', tempBase: -10, tempLapse: -6.5, humidityBase: 0.4, pressureKPa: 19.4 },
+                    { altitude: 18, name: 'upper-tropos', tempBase: -30, tempLapse: -5.2, humidityBase: 0.25, pressureKPa: 7.6 }
+                ];
+                this.baseTime = performance.now();
+                this.diurnalCycle = 0;
+            }
+            getSoundSpeed(altitude) {
+                const temp = this.getTemperature(altitude);
+                return Math.sqrt(331.3 + 0.606 * temp); // m/s
+            }
+            getTemperature(altitude) {
+                let temp = 15 + (window.DayNight ? window.DayNight.tempOffset || 0 : 0);
+                temp -= (altitude / 1000) * 6.5;
+                // diurnal variation (stronger near surface)
+                const diurnalAmp = Math.max(0, 1 - altitude / 40) * 4;
+                temp += Math.sin(this.diurnalCycle * Math.PI * 2) * diurnalAmp;
+                return temp;
+            }
+            getPressure(altitude) {
+                const sea = 101.325;
+                const tempAvg = (this.getTemperature(0) + this.getTemperature(altitude)) / 2 + 273.15;
+                return sea * Math.exp(-9.81 * altitude * 1000 / (287 * tempAvg));
+            }
+            getHumidity(altitude) {
+                let h = 0.7 - (altitude / 40) * 0.65; // decrease with altitude
+                h *= 0.8 + 0.2 * Math.sin(this.diurnalCycle * Math.PI * 2);
+                return Math.max(0.05, Math.min(1, h));
+            }
+            update(deltaMs) {
+                this.diurnalCycle = (this.diurnalCycle + deltaMs / 86400000) % 1;
+            }
+            // CAPE: Convective Available Potential Energy (proxy for updraft strength)
+            computeCALE(cloudBase, cloudTop) {
+                const temp_base = this.getTemperature(cloudBase) + 273.15;
+                const temp_top = this.getTemperature(cloudTop) + 273.15;
+                const envTemp_mid = (this.getTemperature(cloudBase) + this.getTemperature(cloudTop)) / 2 + 273.15;
+                const lapseCond = 6.5; // moist adiabatic lapse rate
+                const buoyancy = ((temp_base - envTemp_mid) / envTemp_mid) * 9.81;
+                const depth = (cloudTop - cloudBase) * 1000; // convert to meters
+                return Math.max(0, buoyancy * depth * 0.5); // proxy CAPE
+            }
+        }
+
+        // WIND SHEAR & HELICITY SYSTEM
+        class WindShearSystem {
+            constructor(windFieldRef) {
+                this.windField = windFieldRef;
+                this.shearLayers = [];
+            }
+            // compute 0-6km wind shear (proxy)
+            computeShear(x, z) {
+                const w_low = this.windField.getAt(x, 1, z);
+                const w_high = this.windField.getAt(x, 6, z);
+                const shear = Math.sqrt((w_high.x - w_low.x)**2 + (w_high.z - w_low.z)**2);
+                return shear * 0.25; // scale to meaningful units
+            }
+            // Storm-relative helicity (SRH) - measure of rotation potential
+            computeSRH(cloudX, cloudZ, cloudBase, cloudTop) {
+                let srh = 0;
+                const steps = 6;
+                for (let i = 0; i < steps; i++) {
+                    const alt = cloudBase + (cloudTop - cloudBase) * i / steps;
+                    const w = this.windField.getAt(cloudX, alt, cloudZ);
+                    const perp_x = -w.z;
+                    const perp_z = w.x;
+                    // relative vorticity from wind shear (rough approximation)
+                    const vorticityMagnitude = Math.sqrt(perp_x*perp_x + perp_z*perp_z) * 0.05;
+                    srh += vorticityMagnitude;
+                }
+                return srh / steps;
+            }
+            // apply wind shear to cloud rotation/tilt
+            applyShearToCloud(cloud, shearMagnitude) {
+                if (!cloud) return;
+                // stronger shear tilts cloud and can promote rotating updraft
+                cloud.tilt = (cloud.tilt || 0) + shearMagnitude * 0.002;
+                cloud.rotationRate = (cloud.rotationRate || 0) + shearMagnitude * 0.008;
+            }
+        }
+
+        // HAIL/GRAUPEL GROWTH SYSTEM
+        class HailGrowelSystem {
+            constructor(precipSystemRef, atmosphereRef) {
+                this.precipSystem = precipSystemRef;
+                this.atmosphere = atmosphereRef;
+                this.hailstones = []; // separate tracking for hail
+                this.maxHail = 400;
+                this.hailIndices = []; // indices into precipitation system that are hail
+            }
+            // promote a raindrop to graupel/hail if conditions allow (supercooled water + ice nuclei)
+            promoteToHail(dropIndex, temperature, altitude, cloudTop) {
+                if (this.hailIndices.length >= this.maxHail) return false;
+                // hail forms at mid-level altitudes (8-18 km) with supercooled water (-15..-5°C)
+                if (altitude < 6 || altitude > cloudTop + 3) return false;
+                if (temperature > -5 || temperature < -30) return false; // optimal supercooled layer
+                if (Math.random() > 0.035) return false; // rare event
+                this.hailIndices.push(dropIndex);
+                // graupel starts small
+                this.precipSystem.size[dropIndex] = Math.max(0.8, this.precipSystem.size[dropIndex] * 1.2);
+                this.precipSystem.type[dropIndex] = 'graupel';
+                this.precipSystem.quality[dropIndex] = 0.85; // denser/more icy
+                return true;
+            }
+            // grow hail through collision with supercooled droplets
+            growHail(hailIdx) {
+                if (hailIdx < 0 || hailIdx >= this.precipSystem.max) return;
+                const hsize = this.precipSystem.size[hailIdx];
+                if (hsize < 0.9) return; // not large enough yet
+                const hx = this.precipSystem.pos[hailIdx*3];
+                const hy = this.precipSystem.pos[hailIdx*3+1];
+                const hz = this.precipSystem.pos[hailIdx*3+2];
+                const temp = this.atmosphere.getTemperature(hy);
+                if (temp > -8) return; // too warm, no accretion
+                // scan nearby drops for collision
+                for (let j = 0; j < this.precipSystem.max; j++) {
+                    if (j === hailIdx || !this.precipSystem.drops[j].active) continue;
+                    if (this.precipSystem.type[j] !== 'rain' && this.precipSystem.type[j] !== 'sleet') continue;
+                    const dx = hx - this.precipSystem.pos[j*3];
+                    const dy = hy - this.precipSystem.pos[j*3+1];
+                    const dz = hz - this.precipSystem.pos[j*3+2];
+                    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    if (dist < hsize * 0.4 + this.precipSystem.size[j] * 0.2) {
+                        // collision: accrete small amount
+                        const accretionMass = this.precipSystem.size[j] * 0.08;
+                        this.precipSystem.size[hailIdx] += accretionMass;
+                        this.precipSystem.size[j] *= 0.92; // victim shrinks
+                        // increase density slightly
+                        this.precipSystem.quality[hailIdx] = Math.min(2.0, this.precipSystem.quality[hailIdx] + 0.15);
+                        // if hail is very large, it may evolve to true hail (denser)
+                        if (this.precipSystem.size[hailIdx] > 2.8) {
+                            this.precipSystem.type[hailIdx] = 'hail';
+                            this.precipSystem.quality[hailIdx] = 1.6; // very dense
+                        }
+                    }
+                }
+            }
+            update() {
+                // update all tracked hail/graupel
+                for (let i = this.hailIndices.length - 1; i >= 0; i--) {
+                    const idx = this.hailIndices[i];
+                    if (!this.precipSystem.drops[idx] || !this.precipSystem.drops[idx].active) {
+                        this.hailIndices.splice(i, 1);
+                        continue;
+                    }
+                    const alt = this.precipSystem.pos[idx*3+1];
+                    const temp = this.atmosphere.getTemperature(alt);
+                    // grow hail in supercooled layer
+                    this.growHail(idx);
+                    // hail melts rapidly if temperature rises above -5
+                    if (temp > -5 && alt < 6) {
+                        if (Math.random() < 0.08) {
+                            this.precipSystem.type[idx] = 'rain';
+                            this.hailIndices.splice(i, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        // ENHANCED ELECTROSTATIC CHARGING with feedback to cloud properties
+        class ElectrostaticSystem {
+            constructor(cloudSystemRef, lightningSystemRef, atmosphereRef) {
+                this.cloudSystem = cloudSystemRef;
+                this.lightningSystem = lightningSystemRef;
+                this.atmosphere = atmosphereRef;
+                // ensure the same WeakMap name is used everywhere (_cloudCharge) to avoid undefined access
+                this._cloudCharge = new WeakMap();
+                // keep legacy alias for any older code references
+                this.cloudCharges = this._cloudCharge;
+                this.chargeHistory = []; // track recent charge events
+            }
+            // Triboelectric charging: graupel/hail + ice crystal interactions
+            computeChargeGeneration(cloud, graupelCount) {
+                if (!cloud || cloud.stage !== 'cumulonimbus' && cloud.stage !== 'supercell') return 0;
+                const baseChargeRate = cloud.mass * (cloud.condensationLevel || 0.3) * 0.05;
+                // graupel collisions enhance charge separation significantly
+                const graupelBoost = Math.min(1.8, graupelCount * 0.0008);
+                const total = baseChargeRate * (1 + graupelBoost);
+                return total;
+            }
+            // Electrostatic feedback: strong charge fields enhance updraft and ice formation
+            applyChargeEffects(cloud) {
+                if (!cloud) return;
+                const charge = Math.abs(this._cloudCharge.get(cloud) || 0);
+                // strong electric field amplifies vertical motion slightly
+                const chargeInfluence = Math.min(0.4, charge / 120);
+                cloud.buoyancy = (cloud.buoyancy || 0.5) * (1 + chargeInfluence * 0.15);
+                // promote ice formation in strongly-charged regions
+                if (charge > 80 && Math.random() < 0.02) {
+                    cloud.condensationLevel = Math.min(1.0, (cloud.condensationLevel || 0.5) + 0.08);
+                }
+            }
+            update(t, precipSystem, graupelCount) {
+                for (const cloud of this.cloudSystem.clouds || []) {
+                    if (!cloud) continue;
+                    const charge = this.computeChargeGeneration(cloud, graupelCount);
+                    const prev = this._cloudCharge.get(cloud) || 0;
+                    const newCharge = prev * 0.97 + charge;
+                    this._cloudCharge.set(cloud, newCharge);
+                    // apply electrostatic feedback
+                    this.applyChargeEffects(cloud);
+                }
+            }
+        }
+
+        // CORIOLIS-LIKE EFFECT & LARGE-SCALE ROTATION
+        class CoriolisSystem {
+            constructor(windFieldRef, latitude = 40) {
+                this.windField = windFieldRef;
+                this.latitude = latitude * Math.PI / 180; // convert to radians
+                this.f = 2 * 7.27e-5 * Math.sin(this.latitude); // Coriolis parameter
+            }
+            // apply Coriolis deflection to wind field over time (slow, large-scale)
+            applyCoriolisToWind(dt) {
+                const size = this.windField.size;
+                const spacing = this.windField.spacing;
+                dt = dt * 0.00001; // slow application to avoid instability
+                for (let gx = 0; gx < size; gx++) {
+                    for (let gy = 0; gy < size; gy++) {
+                        for (let gz = 0; gz < size; gz++) {
+                            const cell = this.windField.field[gx][gy][gz];
+                            const vx = cell.x;
+                            const vz = cell.z;
+                            // simple Coriolis deflection: f-effect rotates wind vector
+                            const deflect = this.f * dt;
+                            cell.x += vz * deflect;
+                            cell.z -= vx * deflect;
+                            // damp slightly to prevent runaway
+                            cell.x *= 0.9998;
+                            cell.z *= 0.9998;
+                        }
+                    }
+                }
+            }
+        }
+
+        // TURBULENCE CASCADE SYSTEM: Model turbulent kinetic energy at multiple scales
+        class TurbulenceCascade {
+            constructor(windFieldRef) {
+                this.windField = windFieldRef;
+                this.energyLevels = []; // kinetic energy at different scales
+                this.dissipationRate = 0.85; // cascade dissipation per level
+            }
+            // inject turbulence at large scales (e.g., from convection)
+            injectEnergy(x, z, altitude, energyAmount) {
+                const size = this.windField.size;
+                const spacing = this.windField.spacing;
+                const gx = Math.floor((x / spacing) + size / 2);
+                const gy = Math.floor(altitude / spacing);
+                const gz = Math.floor((z / spacing) + size / 2);
+                if (gx < 0 || gx >= size || gy < 0 || gy >= size || gz < 0 || gz >= size) return;
+                const cell = this.windField.field[gx][gy][gz];
+                const angle = Math.random() * Math.PI * 2;
+                const ampl = Math.sqrt(energyAmount);
+                cell.x += Math.cos(angle) * ampl * 0.05;
+                cell.z += Math.sin(angle) * ampl * 0.05;
+            }
+            // cascade energy down from large to small scales
+            updateCascade(dt) {
+                dt = Math.min(dt, 0.016); // clamp per-frame update
+                const size = this.windField.size;
+                // Apply dissipation: cascade energy to finer scales with damping
+                for (let gx = 0; gx < size; gx++) {
+                    for (let gy = 0; gy < size; gy++) {
+                        for (let gz = 0; gz < size; gz++) {
+                            const cell = this.windField.field[gx][gy][gz];
+                            const mag = Math.sqrt(cell.x*cell.x + cell.z*cell.z);
+                            // dissipation increases with gradient
+                            cell.x *= (0.92 - mag * 0.01);
+                            cell.z *= (0.92 - mag * 0.01);
+                        }
+                    }
+                }
+            }
+        }
+
+        // LAYER-BASED UPDRAFT SYSTEM with multiple vertical columns
+        class LayeredUpdraftSystem {
+            constructor(cloudSystemRef) {
+                this.cloudSystem = cloudSystemRef;
+                this.updraftColumns = []; // vertical updraft features
+            }
+            spawnColumn(x, z, strength, radius, baseAltitude) {
+                const col = {
+                    x, z, strength, radius,
+                    baseAlt: baseAltitude,
+                    topAlt: baseAltitude + 8 + Math.random() * 12,
+                    age: 0, maxAge: 400 + Math.random() * 300,
+                    rotation: Math.random() > 0.5 ? 1 : -1,
+                    subColumns: [] // sub-vortices within main updraft
+                };
+                // create sub-vortex cores
+                for (let s = 0; s < 2; s++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const offsetRadius = radius * (0.3 + Math.random() * 0.4);
+                    col.subColumns.push({
+                        x: x + Math.cos(angle) * offsetRadius,
+                        z: z + Math.sin(angle) * offsetRadius,
+                        strength: strength * (0.5 + Math.random() * 0.5),
+                        radius: radius * 0.4,
+                        rotation: col.rotation
+                    });
+                }
+                this.updraftColumns.push(col);
+            }
+            applyUpdraftsToWind(windField) {
+                for (const col of this.updraftColumns) {
+                    const size = windField.size;
+                    const spacing = windField.spacing;
+                    for (let gx = 0; gx < size; gx++) {
+                        for (let gy = 0; gy < size; gy++) {
+                            for (let gz = 0; gz < size; gz++) {
+                                const wx = (gx - size / 2) * spacing;
+                                const wy = gy * spacing;
+                                const wz = (gz - size / 2) * spacing;
+                                // check distance to main column
+                                const dist = Math.hypot(wx - col.x, wz - col.z);
+                                if (dist < col.radius && wy >= col.baseAlt && wy <= col.topAlt) {
+                                    const influence = Math.max(0, 1 - dist / col.radius);
+                                    const cell = windField.field[gx][gy][gz];
+                                    // vertical updraft
+                                    cell.__updraft = (cell.__updraft || 0) + influence * col.strength * 0.08;
+                                    // rotational component (cyclone-like)
+                                    const ang = Math.atan2(wz - col.z, wx - col.x);
+                                    cell.x += -Math.sin(ang) * influence * col.strength * col.rotation * 0.04;
+                                    cell.z += Math.cos(ang) * influence * col.strength * col.rotation * 0.04;
+                                }
+                                // check sub-vortices
+                                for (const subcol of col.subColumns) {
+                                    const subdist = Math.hypot(wx - subcol.x, wz - subcol.z);
+                                    if (subdist < subcol.radius && wy >= col.baseAlt && wy <= col.topAlt) {
+                                        const subinfl = Math.max(0, 1 - subdist / subcol.radius);
+                                        const cell = windField.field[gx][gy][gz];
+                                        cell.__updraft = (cell.__updraft || 0) + subinfl * subcol.strength * 0.06;
+                                        const sang = Math.atan2(wz - subcol.z, wx - subcol.x);
+                                        cell.x += -Math.sin(sang) * subinfl * subcol.strength * subcol.rotation * 0.06;
+                                        cell.z += Math.cos(sang) * subinfl * subcol.strength * subcol.rotation * 0.06;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            update(t) {
+                for (let i = this.updraftColumns.length - 1; i >= 0; i--) {
+                    const col = this.updraftColumns[i];
+                    col.age++;
+                    col.strength *= 0.98; // decay
+                    if (col.age > col.maxAge || col.strength < 0.05) {
+                        this.updraftColumns.splice(i, 1);
+                    }
+                }
+                // occasionally spawn new columns under mature clouds
+                const mature = this.cloudSystem.getMature();
+                if (mature.length > 0 && Math.random() < 0.008) {
+                    const c = mature[Math.floor(Math.random() * mature.length)];
+                    this.spawnColumn(c.x, c.z, 3 + Math.random() * 4, 12 + Math.random() * 8, c.cloudBase || 8);
+                }
+            }
         }
 
         function init() {
@@ -3350,6 +4202,27 @@
                 };
             })();
 
+            // NEW: Initialize atmospheric layers system
+            AppState.atmosphericLayers = new AtmosphericLayers();
+            
+            // NEW: Initialize wind shear system
+            AppState.windShearSystem = new WindShearSystem(AppState.windField);
+            
+            // NEW: Initialize hail/graupel system
+            AppState.hailSystem = new HailGrowelSystem(AppState.rainSystem, AppState.atmosphericLayers);
+            
+            // NEW: Initialize electrostatic system with feedback
+            AppState.electrostaticSystem = new ElectrostaticSystem(AppState.cloudSystem, AppState.lightningSystem, AppState.atmosphericLayers);
+            
+            // NEW: Initialize Coriolis system
+            AppState.coriolisSystem = new CoriolisSystem(AppState.windField, 40); // 40° N latitude
+            
+            // NEW: Initialize turbulence cascade
+            AppState.turbulenceCascade = new TurbulenceCascade(AppState.windField);
+            
+            // NEW: Initialize layered updraft system
+            AppState.layeredUpdraftSystem = new LayeredUpdraftSystem(AppState.cloudSystem);
+            
             setupControls();
             // detect CPU & GPU and display
             (function detectHardware() {
@@ -3385,8 +4258,16 @@
             requestAnimationFrame(animate);
             const t = performance.now();
 
-            // compute delta time in seconds for movement integration
-            const dt = ((t - (AppState._lastTime || t)) / 1000) || 0;
+            // compute delta time robustly to avoid TDZ / "Cannot access 'deltaMs' before initialization"
+            // ensure AppState._lastTime exists, then compute deltaMs (ms) and dt (s)
+            let deltaMs = 0;
+            if (!AppState._lastTime) {
+                // first frame: assume ~16.67ms (60fps) to avoid large first-step jumps
+                deltaMs = 16.6667;
+            } else {
+                deltaMs = t - AppState._lastTime;
+            }
+            const dt = (deltaMs / 1000) || 0;
             AppState._lastTime = t;
 
             if (AppState.paused) {
@@ -3395,30 +4276,113 @@
                 return;
             }
 
-            const ws = AppState.windField.update(t);
+            // Safely update wind field (guard in case it's not yet initialized)
+            let ws = { x: 0, z: 0 };
+            try {
+                if (AppState.windField && typeof AppState.windField.update === 'function') {
+                    ws = AppState.windField.update(t) || ws;
+                }
+            } catch (e) {
+                console.warn('WindField.update error:', e);
+                ws = { x: 0, z: 0 };
+            }
+
+            // NEW: Update atmospheric layers
+            try {
+                if (AppState.atmosphericLayers && typeof AppState.atmosphericLayers.update === 'function') {
+                    AppState.atmosphericLayers.update(deltaMs);
+                }
+            } catch (e) {
+                console.warn('AtmosphericLayers.update error:', e);
+            }
+            
+            // NEW: Apply Coriolis effects (slow, large-scale)
+            try {
+                if (AppState.coriolisSystem && typeof AppState.coriolisSystem.applyCoriolisToWind === 'function') {
+                    AppState.coriolisSystem.applyCoriolisToWind(deltaMs);
+                }
+            } catch (e) {
+                console.warn('Coriolis.apply error:', e);
+            }
+            
+            // NEW: Update turbulence cascade
+            try {
+                if (AppState.turbulenceCascade && typeof AppState.turbulenceCascade.updateCascade === 'function') {
+                    AppState.turbulenceCascade.updateCascade(deltaMs);
+                }
+            } catch (e) {
+                console.warn('TurbulenceCascade.updateCascade error:', e);
+            }
+            
+            // NEW: Apply layered updrafts
+            try {
+                if (AppState.layeredUpdraftSystem) {
+                    if (typeof AppState.layeredUpdraftSystem.applyUpdraftsToWind === 'function') {
+                        AppState.layeredUpdraftSystem.applyUpdraftsToWind(AppState.windField);
+                    }
+                    if (typeof AppState.layeredUpdraftSystem.update === 'function') {
+                        AppState.layeredUpdraftSystem.update(t);
+                    }
+                }
+            } catch (e) {
+                console.warn('LayeredUpdraftSystem error:', e);
+            }
 
             // New systems should be updated after the core wind update so they can perturb the field
-            if (AppState.warmFrontSystem) AppState.warmFrontSystem.update(t);
-            if (AppState.coldFrontSystem) AppState.coldFrontSystem.update(t);
-            if (AppState.derechoSystem) AppState.derechoSystem.update(t);
+            try { if (AppState.warmFrontSystem && typeof AppState.warmFrontSystem.update === 'function') AppState.warmFrontSystem.update(t); } catch (e) { console.warn('WarmFront.update error:', e); }
+            try { if (AppState.coldFrontSystem && typeof AppState.coldFrontSystem.update === 'function') AppState.coldFrontSystem.update(t); } catch (e) { console.warn('ColdFront.update error:', e); }
+            try { if (AppState.derechoSystem && typeof AppState.derechoSystem.update === 'function') AppState.derechoSystem.update(t); } catch (e) { console.warn('Derecho.update error:', e); }
 
             // Apply downburst effects after base wind update so perturbations persist for this frame
-            if (AppState.downburstSystem) AppState.downburstSystem.update(t);
-            if (AppState.tornadoSystem) AppState.tornadoSystem.update(t);
+            try { if (AppState.downburstSystem && typeof AppState.downburstSystem.update === 'function') AppState.downburstSystem.update(t); } catch (e) { console.warn('Downburst.update error:', e); }
+            try { if (AppState.tornadoSystem && typeof AppState.tornadoSystem.update === 'function') AppState.tornadoSystem.update(t); } catch (e) { console.warn('TornadoSystem.update error:', e); }
             const windSpeed = Math.sqrt(ws.x * ws.x + ws.z * ws.z);
             
-            AppState.evaporationSystem.update();
-            AppState.cloudSystem.update(t);
+            try { if (AppState.evaporationSystem && typeof AppState.evaporationSystem.update === 'function') AppState.evaporationSystem.update(); } catch (e) { console.warn('EvaporationSystem.update error:', e); }
+            try { if (AppState.cloudSystem && typeof AppState.cloudSystem.update === 'function') AppState.cloudSystem.update(t); } catch (e) { console.warn('CloudGrowth.update error:', e); }
             // apply diurnal infrared/temperature update (DayNight)
-            const deltaMs = (dt * 1000);
-            if (window.DayNight) window.DayNight.update(deltaMs);
-            applyDayNightToScene();
-            const activePart = AppState.rainSystem.update();
-            AppState.lightningSystem.update(t);
-            if (AppState.rainbowSystem) AppState.rainbowSystem.update(t);
+            try { if (window.DayNight && typeof window.DayNight.update === 'function') window.DayNight.update(deltaMs); } catch (e) { console.warn('DayNight.update error:', e); }
+            try { applyDayNightToScene(); } catch (e) { console.warn('applyDayNightToScene error:', e); }
+
+            // precipitation update: guard against missing/partially-initialized system
+            let activePart = 0;
+            try {
+                if (AppState.rainSystem && typeof AppState.rainSystem.update === 'function') {
+                    activePart = AppState.rainSystem.update() || 0;
+                } else {
+                    activePart = 0;
+                }
+            } catch (e) {
+                console.warn('Precipitation.update error:', e);
+                activePart = 0;
+            }
+
+            try { if (AppState.lightningSystem && typeof AppState.lightningSystem.update === 'function') AppState.lightningSystem.update(t); } catch (e) { console.warn('Lightning.update error:', e); }
+            try { if (AppState.rainbowSystem && typeof AppState.rainbowSystem.update === 'function') AppState.rainbowSystem.update(t); } catch (e) { console.warn('RainbowSystem.update error:', e); }
+
+            // NEW: Update hail system
+            try { if (AppState.hailSystem && typeof AppState.hailSystem.update === 'function') AppState.hailSystem.update(); } catch (e) { console.warn('HailSystem.update error:', e); }
+            
+            // Count graupel for charging system
+            let graupelCount = 0;
+            try {
+                if (AppState.rainSystem) {
+                    for (let i = 0; i < (AppState.rainSystem.max || 0); i++) {
+                        if (AppState.rainSystem.drops && AppState.rainSystem.drops[i] && AppState.rainSystem.type && AppState.rainSystem.type[i] === 'graupel') {
+                            graupelCount++;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('graupel counting error:', e);
+                graupelCount = 0;
+            }
+            
+            // NEW: Update electrostatic system
+            try { if (AppState.electrostaticSystem && typeof AppState.electrostaticSystem.update === 'function') AppState.electrostaticSystem.update(t, AppState.rainSystem, graupelCount); } catch (e) { console.warn('Electrostatic.update error:', e); }
 
             // update sun effects (glare & godrays) per-frame
-            if (AppState._updateSunEffects) AppState._updateSunEffects();
+            try { if (AppState._updateSunEffects) AppState._updateSunEffects(); } catch (e) { console.warn('SunEffects update error:', e); }
 
             // Apply first-person movement based on joystick / forward button inputs
             if (AppState.firstPerson) {
@@ -3501,9 +4465,9 @@
             if (t - lastFps > 1000) {
                 document.getElementById('fps').textContent = frames;
                 document.getElementById('particles').textContent = activePart;
-                document.getElementById('clouds').textContent = AppState.cloudSystem.clouds.length;
-                document.getElementById('charge').textContent = Math.floor(AppState.lightningSystem.charge);
-                document.getElementById('strikes').textContent = AppState.lightningSystem.count;
+                document.getElementById('clouds').textContent = AppState.cloudSystem && AppState.cloudSystem.clouds ? AppState.cloudSystem.clouds.length : 0;
+                document.getElementById('charge').textContent = AppState.lightningSystem ? Math.floor(AppState.lightningSystem.charge || 0) : 0;
+                document.getElementById('strikes').textContent = AppState.lightningSystem ? (AppState.lightningSystem.count || 0) : 0;
                 document.getElementById('wind').textContent = windSpeed.toFixed(1);
                 // update hardware readout occasionally
                 try {
