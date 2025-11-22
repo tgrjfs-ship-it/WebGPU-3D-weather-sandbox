@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -750,7 +750,8 @@
                     });
                     const mesh = new THREE.Mesh(geom, mat);
                     mesh.position.set(x, y, z);
-                    mesh.rotation.set(-Math.PI/2 + (Math.random()-0.5)*0.25, Math.random()*Math.PI, (Math.random()-0.5)*0.4);
+                    // orient as a broad horizontal sheet with a small random tilt rather than a 90° flip
+                    mesh.rotation.set((Math.random() - 0.5) * 0.18, Math.random() * Math.PI, (Math.random() - 0.5) * 0.18);
                     mesh.castShadow = false;
                     mesh.receiveShadow = false;
                     return mesh;
@@ -1184,7 +1185,90 @@
                         growthStage = 'dissipating';
                         c.stage = 'dissipating';
                     }
-                    
+
+                    // --- Anvil top (thin ice crystal sheet) creation for mature storms ---
+                    // create and maintain a thin anvil composed of cirrostratus-like puffs above mature clouds
+                    if ((c.stage === 'cumulonimbus' || c.stage === 'supercell') && !c.dying) {
+                        // initialize anvil timer/flag if missing
+                        if (!c.hasAnvil) {
+                            c.hasAnvil = false;
+                            c.anvilTimer = 0;
+                        }
+                        // small chance to form a persistent anvil structure
+                        if (!c.hasAnvil && Math.random() < 0.06) {
+                            c.hasAnvil = true;
+                            c.anvilTimer = 300 + Math.floor(Math.random() * 400);
+                            // populate a broad thin sheet of larger, low-density ice puffs
+                            // more anvil elements for broader coverage
+                            const anvilCount = 4 + Math.floor(Math.min(18, c.radius * 0.9));
+                            for (let ai = 0; ai < anvilCount; ai++) {
+                                const ax = (Math.random() - 0.5) * c.radius * (2.2 + Math.random() * 1.5);
+                                const az = (Math.random() - 0.5) * c.radius * (2.2 + Math.random() * 1.5);
+                                // place anvil substantially higher than cloud top so ice sheet sits well above convective core
+                                const ay = (c.cloudTop || c.height) + 6 + Math.random() * 6;
+                                const asize = 4.0 + Math.random() * 6.0; // larger but thinner than core puffs
+                                const dark = 0.06 + Math.random() * 0.07;
+                                const anvilPuff = this.makePuff(ax, ay, az, asize, dark, 0.06, 'cirrostratus');
+                                // flag as ice-like and lower density so they look thin and mostly crystalline
+                                anvilPuff.userData = anvilPuff.userData || {};
+                                anvilPuff.userData.ice = true;
+                                // increase density so anvil contributes more to local puffDensity and precipitation sourcing
+                                anvilPuff.userData.density = Math.max(0.22, Math.min(0.85, (anvilPuff.userData.density || 0.28) * 1.1));
+                                // ensure anvil puffs are slightly more horizontal/stretched
+                                if (anvilPuff.scale) {
+                                    anvilPuff.scale.set(asize * 0.9, Math.max(0.6, asize * 0.22), asize * 1.1);
+                                }
+                                // Make the puff local to the cloud group so it follows the parent cloud.
+                                // The makePuff call above used ax/az as local horizontal offsets but ay as absolute height;
+                                // convert puff.position.y to be relative to the cloud group's vertical origin so that
+                                // when the cloud group moves the anvil remains perched on top.
+                                // Use cloudTop/height to compute local Y.
+                                const cloudTopY = (c.cloudTop || c.height || 0);
+                                // If the puff already has a world-style y, convert to local by subtracting cloudTopY,
+                                // otherwise keep as provided if small.
+                                anvilPuff.position.set(ax, (ay - cloudTopY), az);
+                                anvilPuff.userData.isAnvil = true;
+                                anvilPuff.userData.localYOffset = anvilPuff.position.y;
+                                c.puffs.push(anvilPuff);
+                                c.grp.add(anvilPuff);
+                            }
+                        }
+
+                        // slowly decay anvil existence and occasionally refresh fine structure
+                        if (c.hasAnvil) {
+                            c.anvilTimer--;
+                            if (c.anvilTimer % 80 === 0 && Math.random() < 0.45) {
+                                // inject a few thin wisps to keep topology varied
+                                const ax = (Math.random() - 0.5) * c.radius * (1.6 + Math.random() * 1.2);
+                                const az = (Math.random() - 0.5) * c.radius * (1.6 + Math.random() * 1.2);
+                                // keep wisps higher as well
+                                const ay = (c.cloudTop || c.height) + 6.5 + Math.random() * 4.0;
+                                const asize = 2.2 + Math.random() * 3.6;
+                                const anvilWisp = this.makePuff(ax, ay, az, asize, 0.03 + Math.random() * 0.06, 0.02, 'cirrostratus');
+                                anvilWisp.userData = anvilWisp.userData || {};
+                                anvilWisp.userData.ice = true;
+                                // increase density of wisps so they better influence puff density sampling
+                                anvilWisp.userData.density = Math.max(0.12, Math.min(0.6, (anvilWisp.userData.density || 0.18) * 0.9));
+                                // convert to local Y so it stays attached to cloud top
+                                const cloudTopY2 = (c.cloudTop || c.height || 0);
+                                anvilWisp.position.set(ax, (ay - cloudTopY2), az);
+                                anvilWisp.userData.isAnvil = true;
+                                anvilWisp.userData.localYOffset = anvilWisp.position.y;
+                                c.puffs.push(anvilWisp);
+                                c.grp.add(anvilWisp);
+                            }
+                            // anvil occasionally produces light precipitation (thin virga or weak drizzle) sourced from the parent cloud
+                            // make anvil-sourced precipitation significantly more likely
+                            if (AppState.rainSystem && Math.random() < 0.065) {
+                                try { AppState.rainSystem.spawnDropFromCloud(c); } catch(e) {}
+                            }
+                            if (c.anvilTimer <= 0 || Math.random() < 0.006) {
+                                // mark to slowly dissipate anvil puffs (they are regular puffs so dissipation handled elsewhere)
+                                c.hasAnvil = false;
+                            }
+                        }
+                    }
+
                     // Multi-stage growth based on cloud type
                     let effectiveGrowthRate = c.growthRate;
                     if (c.stage === 'cumulus') {
@@ -1293,6 +1377,14 @@
                     // Enhanced animation with turbulence
                     c.puffs.forEach((p, i) => {
                         if (p) {
+                            // Ensure anvil puffs remain perched on top of the parent cloud:
+                            // use stored localYOffset (set when anvil created) plus current cloudTop so the anvil sits above the cloud.
+                            if (p.userData && p.userData.isAnvil) {
+                                const localY = (p.userData.localYOffset !== undefined) ? p.userData.localYOffset : p.position.y;
+                                // keep anvil at cloudTop + local offset (local Y within c.grp)
+                                p.position.y = (c.cloudTop || c.height || 0) + localY;
+                            }
+
                             p.rotation.y += 0.0002 + c.turbulence * 0.0005;
                             p.rotation.z += c.turbulence * 0.0003;
                             
