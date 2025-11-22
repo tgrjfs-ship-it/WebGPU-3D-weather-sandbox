@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Storm Simulation</title>
+    <title>weather simulation</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; font-family: 'Noto Sans', sans-serif; }
@@ -1259,7 +1259,7 @@
                             }
                             // anvil occasionally produces light precipitation (thin virga or weak drizzle) sourced from the parent cloud
                             // make anvil-sourced precipitation significantly more likely
-                            if (AppState.rainSystem && Math.random() < 0.065) {
+                            if (AppState.rainSystem && Math.random() < 0.6) {
                                 try { AppState.rainSystem.spawnDropFromCloud(c); } catch(e) {}
                             }
                             if (c.anvilTimer <= 0 || Math.random() < 0.006) {
@@ -1296,7 +1296,7 @@
                         if (c.puffs.length % 16 === 0) {
                             const anvilPuff = this.makePuff(
                                 (Math.random() - 0.5) * (c.radius + 8),
-                                c.cloudTop + 3 + Math.random() * 2,
+                                c.cloudTop + 6 + Math.random() * 2,
                                 (Math.random() - 0.5) * (c.radius + 8),
                                 2.5 + Math.random() * 3.5,
                                 0.25,
