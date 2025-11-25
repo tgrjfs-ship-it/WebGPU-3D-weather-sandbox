@@ -200,6 +200,65 @@
             #info { bottom: 6px; right: 6px; width: 40vw; }
             .top-right-controls { right: 6px; top: 6px; }
         }
+
+        /* Enhanced button and slider styling */
+        .gfx-row input[type="range"] {
+            background: linear-gradient(to right, rgba(108,204,255,0.1), rgba(108,204,255,0.2));
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .gfx-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6cf, #4db8ff);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(108,204,255,0.4);
+            transition: all 140ms ease;
+        }
+        
+        .gfx-row input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+            box-shadow: 0 4px 16px rgba(108,204,255,0.6);
+        }
+        
+        .gfx-row input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6cf, #4db8ff);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(108,204,255,0.4);
+            transition: all 140ms ease;
+        }
+        
+        .gfx-row input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.3);
+            box-shadow: 0 4px 16px rgba(108,204,255,0.6);
+        }
+        
+        .gfx-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #6cf;
+            transition: all 140ms ease;
+        }
+        
+        .gfx-row input[type="checkbox"]:hover {
+            transform: scale(1.2);
+            filter: drop-shadow(0 0 4px rgba(108,204,255,0.5));
+        }
+        
+        .gfx-row input[type="checkbox"]:checked {
+            filter: drop-shadow(0 0 6px rgba(108,204,255,0.8));
+        }
     </style>
 </head>
 <body>
@@ -239,11 +298,11 @@
         </div>
         <div class="gfx-row">
             <label class="gfx-label">Rain ×</label>
-            <input id="rain-intensity-range" type="range" min="0.1" max="15" step="0.05" value="1.0" />
+            <input id="rain-intensity-range" type="range" min="0.1" max="28" step="0.1" value="1.0" />
         </div>
         <div class="gfx-row">
             <label class="gfx-label">Evap ×</label>
-            <input id="evap-mult-range" type="range" min="0.2" max="15" step="0.05" value="1.0" />
+            <input id="evap-mult-range" type="range" min="0.2" max="20" step="0.05" value="1.0" />
         </div>
         <div class="gfx-row">
             <label class="gfx-label">Lightning</label>
@@ -251,15 +310,15 @@
         </div>
         <div class="gfx-row">
             <label class="gfx-label">Particles</label>
-            <input id="particle-range" type="range" min="100" max="80000" step="50" value="600" />
+            <input id="particle-range" type="range" min="100" max="140000" step="100" value="600" />
         </div>
         <div class="gfx-row">
             <label class="gfx-label">Clouds</label>
-            <input id="cloud-range" type="range" min="10" max="80000" step="5" value="80" />
+            <input id="cloud-range" type="range" min="10" max="70000" step="10" value="80" />
         </div>
         <div class="gfx-row">
             <label class="gfx-label">Wind ×</label>
-            <input id="wind-range" type="range" min="0.05" max="50" step="0.01" value="1.0" />
+            <input id="wind-range" type="range" min="0.05" max="10" step="0.05" value="1.0" />
         </div>
         <div class="gfx-row">
             <label class="gfx-label">Pixel Ratio</label>
@@ -267,7 +326,7 @@
         </div>
         <div class="gfx-row">
             <label class="gfx-label">IR ×</label>
-            <input id="ir-range" type="range" min="0.1" max="20" step="0.05" value="1.0" />
+            <input id="ir-range" type="range" min="0.1" max="40" step="0.1" value="1.0" />
         </div>
     </div>
     <div id="info" class="ui-panel">
@@ -357,13 +416,13 @@
             cloudDetail: 50,
             pixelRatio: 1,
             volumetric: true,
-            volumetricDensity: 0.9,
-            volumetricResolution: 24,
+            volumetricDensity: 0.45,
+            volumetricResolution: 12,
             cloudRenderMode: 'volumetric',
             evapMultiplier: 1,
             hailDensity: 1.2,
-            windLayerComplexity: 4.0,
-            microphysicsDetail: 3,
+            windLayerComplexity: 2.0,
+            microphysicsDetail: 1.5,
             atmosphericStability: true,
             windMultiplier: 1.0,
             renderDistance: 260,
@@ -407,7 +466,7 @@
         }
 
         function createTerrain() {
-            const geo = new THREE.PlaneGeometry(800, 800, 200, 200); // increased detail
+            const geo = new THREE.PlaneGeometry(800, 800, 240, 240); // increased detail for better texture
             const pos = geo.attributes.position.array;
             const col = new Float32Array(pos.length);
 
@@ -417,40 +476,85 @@
                 { x: 200, y: -140, r: 80, d: -2.0 }
             ];
 
-            // Mountain ranges definition (used for lenticular / orographic effects)
+            // Mountain ranges with volcano potential
             AppState.mountainRanges = [
-                { x: -80, z: -40, r: 60, height: 12, steepness: 0.9 },
-                { x: 120, z: 100, r: 80, height: 18, steepness: 1.2 },
-                { x: 40, z: -160, r: 50, height: 10, steepness: 0.7 }
+                // Procedurally generate a few mountain ranges with varied seeds, heights, radii and roughness
+                // so lenticular clouds and orographic lift get diverse triggers.
+                (() => {
+                    const arr = [];
+                    const base = [
+                        { x:-80, z:-40 },
+                        { x:120, z:100 },
+                        { x:40, z:-160 },
+                        { x:-200, z:20 },
+                        { x:180, z:-120 }
+                    ];
+                    base.forEach((b, i) => {
+                        const seed = Math.abs(Math.sin((b.x+37.1) * 0.012 + (b.z+91.3) * 0.007 + i) * 10000);
+                        const rnd = (v,min,max) => min + (Math.abs(Math.sin(seed + v)) % 1) * (max - min);
+                        const r = Math.floor(rnd(1, 40, 110));
+                        const h = Math.floor(rnd(2, 10, 30));
+                        const steep = 0.8 + (Math.abs(Math.sin(seed*0.21)) * 0.8);
+                        arr.push({
+                            x: b.x + (Math.sin(seed*0.13)*8),
+                            z: b.z + (Math.cos(seed*0.17)*8),
+                            r,
+                            height: h,
+                            steepness: steep,
+                            roughness: 0.6 + Math.abs(Math.sin(seed*0.19))*0.8,
+                            hasVolcano: Math.random() > 0.5
+                        });
+                    });
+                    return arr;
+                })()
             ];
 
-            // NEW: more complex terrain with ridges, valleys, plateaus
+            // Enhanced terrain with multiple octaves of Perlin-like noise
             for (let i = 0; i < pos.length; i += 3) {
                 const x = pos[i];
                 const y = pos[i + 1];
-                // base undulation
-                let z = Math.sin(x * 0.015) * Math.cos(y * 0.02) * 2.5;
-                // add ridge-like feature
-                z += Math.sin(x * 0.008) * 1.2 * Math.max(0, Math.cos(y * 0.01));
-                // add smaller-scale detail (fractal-like)
-                z += Math.sin(x * 0.045 + y * 0.035) * 0.6;
-                z += Math.sin(x * 0.088) * Math.cos(y * 0.076) * 0.35;
-                // plateau regions
-                const platVal = Math.sin((x + y) * 0.006) * 0.5 + 0.5;
-                if (platVal > 0.4) z += 0.8;
                 
-                // add mountain ranges influence
+                // Multi-octave noise for natural terrain
+                let z = 0;
+                let amplitude = 3.0;
+                let frequency = 0.01;
+                let maxValue = 0;
+                
+                for (let octave = 0; octave < 4; octave++) {
+                    z += Math.sin(x * frequency) * Math.cos(y * frequency * 0.8) * amplitude;
+                    maxValue += amplitude;
+                    amplitude *= 0.5;
+                    frequency *= 2.0;
+                }
+                
+                z = (z / maxValue) * 4.5;
+                
+                // Add ridge features
+                z += Math.sin(x * 0.008) * 1.5 * Math.max(0, Math.cos(y * 0.01));
+                z += Math.sin(x * 0.045 + y * 0.035) * 0.8;
+                
+                // Plateau regions with smooth transitions
+                const platVal = Math.sin((x + y) * 0.006) * 0.5 + 0.5;
+                if (platVal > 0.35) z += 1.2 * (platVal - 0.35);
+                
+                // Mountain ranges with peaks
                 for (const m of AppState.mountainRanges) {
                     const dx = x - m.x;
                     const dz = y - m.z;
                     const dist = Math.sqrt(dx*dx + dz*dz);
-                    if (dist < m.r * 1.25) {
-                        // steeper profile near core, falloff with distance
-                        const fall = Math.pow(1 - Math.min(1, dist / (m.r)), 1.6);
-                        z += m.height * fall * (0.8 + Math.random() * 0.28) * m.steepness;
+                    if (dist < m.r * 1.4) {
+                        const fall = Math.pow(1 - Math.min(1, dist / (m.r * 1.1)), 1.8);
+                        // apply mountain-specific roughness so peaks vary more naturally
+                        const peakNoise = (Math.random() - 0.5) * 2 * (m.roughness || 0.9);
+                        z += m.height * fall * (0.72 + Math.random() * 0.4 + peakNoise) * m.steepness;
+                        // sharp peak for volcanoes
+                        if (m.hasVolcano && dist < m.r * 0.25) {
+                            z += 3.0 * (1 - (dist / (m.r * 0.25)));
+                        }
                     }
                 }
 
+                // Water bodies with smooth depression
                 let isWater = false;
                 for (const w of AppState.waterBodies) {
                     const dist = Math.sqrt((x - w.x) ** 2 + (y - w.y) ** 2);
@@ -462,37 +566,37 @@
                 }
 
                 pos[i + 2] = z;
-                // reworked terrain texture: multi-band stratified coloring with subtle noise
-                const heightFactor = Math.max(0, Math.min(1, (z + 6) / 22));
-                // multiple bands for grass/rock/scree/snow
-                const band = Math.floor(heightFactor * 5);
-                const bandBlend = (heightFactor * 5) - band;
-                let top = [0.85, 0.9, 0.95];
-                let mid = [0.45, 0.55, 0.28];
-                let low = [0.18, 0.32, 0.6];
+                
+                // Enhanced terrain texture with more detail
+                const heightFactor = Math.max(0, Math.min(1, (z + 7) / 26));
+                const noise = Math.sin(x * 0.06 + y * 0.04) * 0.08 + Math.cos(x * 0.08) * 0.06;
+                
                 if (isWater) {
-                    col[i] = 0.18; col[i + 1] = 0.42; col[i + 2] = 0.72;
+                    col[i] = 0.15 + noise * 0.05;
+                    col[i + 1] = 0.38 + noise * 0.08;
+                    col[i + 2] = 0.75 + noise * 0.1;
+                } else if (heightFactor < 0.2) {
+                    // Low grass (vibrant green)
+                    col[i] = 0.18 + noise * 0.05;
+                    col[i + 1] = 0.52 + noise * 0.1;
+                    col[i + 2] = 0.15 + noise * 0.04;
+                } else if (heightFactor < 0.5) {
+                    // Mid grass to rock transition
+                    const blend = (heightFactor - 0.2) / 0.3;
+                    col[i] = (0.28 + noise * 0.06) * (1 - blend) + (0.42 + noise * 0.08) * blend;
+                    col[i + 1] = (0.48 + noise * 0.08) * (1 - blend) + (0.38 + noise * 0.1) * blend;
+                    col[i + 2] = (0.2 + noise * 0.04) * (1 - blend) + (0.32 + noise * 0.08) * blend;
+                } else if (heightFactor < 0.8) {
+                    // Rocky mid
+                    col[i] = 0.44 + noise * 0.08;
+                    col[i + 1] = 0.40 + noise * 0.06;
+                    col[i + 2] = 0.32 + noise * 0.07;
                 } else {
-                    // create a layered palette: low->grass, mid->rock, high->alpine
-                    if (band <= 1) {
-                        // low grass
-                        const g = 0.24 + 0.16 * bandBlend + Math.sin(x * 0.02) * 0.03;
-                        col[i] = Math.min(1, g + 0.06);
-                        col[i + 1] = Math.min(1, 0.42 + 0.12 * bandBlend + Math.cos(y * 0.017) * 0.03);
-                        col[i + 2] = Math.min(1, 0.18 + 0.05 * bandBlend);
-                    } else if (band <= 3) {
-                        // rocky mid
-                        const r = 0.36 + 0.18 * bandBlend + Math.sin((x + y) * 0.011) * 0.04;
-                        col[i] = Math.min(1, r);
-                        col[i + 1] = Math.min(1, 0.38 + 0.12 * bandBlend);
-                        col[i + 2] = Math.min(1, 0.28 - 0.06 * bandBlend);
-                    } else {
-                        // alpine / snow-stipple
-                        const s = 0.72 + 0.18 * bandBlend;
-                        col[i] = Math.min(1, s - Math.random() * 0.06);
-                        col[i + 1] = Math.min(1, s - 0.02 - Math.random() * 0.05);
-                        col[i + 2] = Math.min(1, s - 0.06 - Math.random() * 0.04);
-                    }
+                    // Alpine / snow
+                    const snowIntensity = (heightFactor - 0.8) / 0.2;
+                    col[i] = 0.88 + noise * 0.04 - snowIntensity * 0.08;
+                    col[i + 1] = 0.88 + noise * 0.04 - snowIntensity * 0.1;
+                    col[i + 2] = 0.92 + noise * 0.03 - snowIntensity * 0.06;
                 }
             }
 
@@ -502,11 +606,76 @@
             const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ 
                 vertexColors: true, 
                 roughness: 0.8,
-                metalness: 0.1
+                metalness: 0.08
             }));
             ground.rotation.x = -Math.PI / 2;
+            // ensure ground/mountains are clearly visible and cast/receive shadows
+            ground.position.y = -1.0;
+            ground.castShadow = true;
             ground.receiveShadow = true;
+            // make both sides renderable for safety on some devices
+            ground.material.side = THREE.DoubleSide;
             AppState.scene.add(ground);
+            
+            // Spawn volcanoes on mountain peaks with volcano potential
+            const volcanoSeed = Math.sin(12.34) * 10000; // deterministic seed for volcano generation
+            for (const m of AppState.mountainRanges) {
+                if (m.hasVolcano) {
+                    // Use seed + mountain position to determine exact spawn variation (IMPROVED randomization)
+                    const seedHash = Math.sin(volcanoSeed + m.x * 0.001 + m.z * 0.002) * 10000;
+                    const shouldSpawn = (seedHash % 100) < 55; // 55% chance with seed variation
+                    if (!shouldSpawn) continue;
+                    // NEW: Random per-volcano seed for unique appearance
+                    const uniqueSeed = Math.sin(seedHash + m.x * 0.003 + m.z * 0.005) * 1000;
+                    
+                    // Layered volcanic edifice: rim, inner cone, lava pool and emissive vent (SEEDED VARIATION)
+                    const rimRadius = m.r * 0.42 * (0.8 + (uniqueSeed % 10) * 0.02);
+                    const rimHeight = Math.max(2.2, m.height * 0.42 * (0.9 + (uniqueSeed % 20) * 0.01));
+                    // outer rim (broad low slope)
+                    const rimGeo = new THREE.CylinderGeometry(rimRadius * 1.1, rimRadius, rimHeight * 0.6, 28);
+                    const rimMat = new THREE.MeshStandardMaterial({ color: 0x4a3426, roughness: 0.96, metalness: 0.02 });
+                    const rim = new THREE.Mesh(rimGeo, rimMat);
+                    rim.position.set(m.x, rimHeight * 0.28, m.z);
+                    rim.castShadow = true;
+                    rim.receiveShadow = true;
+                    AppState.scene.add(rim);
+
+                    // inner steep cone (SEEDED)
+                    const coneGeo = new THREE.ConeGeometry(rimRadius * 0.55 * (0.85 + (uniqueSeed % 15) * 0.01), m.height * 0.9 * (0.9 + (uniqueSeed % 10) * 0.01), 20);
+                    coneGeo.translate(0, m.height * 0.45, 0);
+                    const coneMat = new THREE.MeshStandardMaterial({ color: 0x2e2218, roughness: 0.95 });
+                    const inner = new THREE.Mesh(coneGeo, coneMat);
+                    inner.position.set(m.x, rimHeight * 0.18, m.z);
+                    inner.castShadow = true;
+                    AppState.scene.add(inner);
+
+                    // crater lip (SEEDED)
+                    const torusGeo = new THREE.TorusGeometry(rimRadius * 0.42 * (0.9 + (uniqueSeed % 10) * 0.01), Math.max(0.6, rimRadius * 0.08 * (0.8 + (uniqueSeed % 25) * 0.01)), 16, 40);
+                    const torusMat = new THREE.MeshStandardMaterial({ color: 0x2b1d16, roughness: 0.94, metalness: 0.01 });
+                    const crater = new THREE.Mesh(torusGeo, torusMat);
+                    crater.rotation.x = Math.PI / 2;
+                    crater.position.set(m.x, rimHeight * 0.9, m.z);
+                    crater.castShadow = false;
+                    AppState.scene.add(crater);
+
+                    // small lava pool as emissive hemisphere inside crater
+                    const lavaGeo = new THREE.SphereGeometry(Math.max(1.4, rimRadius * 0.36 * (0.85 + (uniqueSeed % 15) * 0.01)), 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+                    const lavaMat = new THREE.MeshStandardMaterial({ color: 0xff5b22, emissive: 0xff6e33, emissiveIntensity: 1.6 * (0.9 + (uniqueSeed % 10) * 0.01), roughness: 0.6, metalness: 0.05 });
+                    const lava = new THREE.Mesh(lavaGeo, lavaMat);
+                    lava.position.set(m.x, rimHeight * 0.9 - 0.6, m.z);
+                    lava.castShadow = false;
+                    AppState.scene.add(lava);
+
+                    // soft point light to make lava glow (SEEDED)
+                    const lavaLight = new THREE.PointLight(0xff6e33, 0.8 * (0.9 + (uniqueSeed % 10) * 0.01), Math.max(18, rimRadius * 2.4));
+                    lavaLight.position.set(m.x, rimHeight * 0.9, m.z);
+                    AppState.scene.add(lavaLight);
+
+                    // add subtle smoke/ember emitter hook (SourceEmitter will create visual puffs)
+                    // pass mountain radius and height so emitter scales to mountain size and produces stronger pyro-convection
+                    AppState.emitters.push(new SourceEmitter('volcano', m.x, m.z, Math.max(8, m.r * 0.9), Math.max(8, m.height * 1.0)));
+                }
+            }
         }
 
         // NEW: Simple water plane with animated waves (vertex displacement shader fallback)
@@ -860,14 +1029,13 @@
 
         // NEW: Urban / City system - lightweight building clusters with night lighting + roads, vehicles, and humans
         class UrbanSystem {
-            constructor(count = 8) {
+            constructor(count = 12) {
                 this.cities = [];
                 this.group = new THREE.Group();
                 AppState.scene.add(this.group);
                 this.count = count;
                 this.vehicles = [];
                 this.pedestrians = [];
-                this.lightPool = [];
                 this._spawnCities();
             }
 
@@ -887,101 +1055,127 @@
             }
 
             _spawnCities() {
-                const spread = 300;
+                const spread = 320;
                 const roadMat = new THREE.MeshStandardMaterial({ color: 0x2f3438, roughness: 0.85 });
+                const industrialMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9, metalness: 0.1 });
+                
                 for (let i = 0; i < this.count; i++) {
                     const cx = (Math.random() * 2 - 1) * spread * 0.7;
                     const cz = (Math.random() * 2 - 1) * spread * 0.7;
-                    const radius = 18 + Math.random() * 40;
-                    const density = 12 + Math.floor(Math.random() * 34);
-                    const city = { x: cx, z: cz, radius, density, buildings: [], lights: [], group: new THREE.Group() };
+                    const radius = 22 + Math.random() * 50;
+                    const density = 18 + Math.floor(Math.random() * 42);
+                    const city = { 
+                        x: cx, z: cz, radius, density, buildings: [], lights: [], 
+                        group: new THREE.Group(),
+                        isIndustrial: Math.random() < 0.35 // 35% chance industrial zone
+                    };
                     city.group.position.set(cx, 0, cz);
                     this.group.add(city.group);
 
-                    // Add simple roads (two crossed axes and some radial connectors)
-                    const roadWidth = 1.8 + Math.random() * 2.6;
-                    const mainRoad = new THREE.Mesh(new THREE.BoxGeometry(radius * 2.2, 0.1, roadWidth), roadMat);
-                    mainRoad.position.set(0, 0.05, 0);
+                    // Roads: main grid
+                    const roadWidth = 2.0 + Math.random() * 3.2;
+                    const mainRoad = new THREE.Mesh(new THREE.BoxGeometry(radius * 2.4, 0.12, roadWidth), roadMat);
+                    mainRoad.position.set(0, 0.06, 0);
                     city.group.add(mainRoad);
-                    const crossRoad = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, 0.1, radius * 2.2), roadMat);
-                    crossRoad.position.set(0, 0.05, 0);
+                    const crossRoad = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, 0.12, radius * 2.4), roadMat);
+                    crossRoad.position.set(0, 0.06, 0);
                     city.group.add(crossRoad);
 
-                    // spawn building blocks (low-poly for performance)
-                    for (let b = 0; b < density; b++) {
-                        const ang = Math.random() * Math.PI * 2;
-                        const r = Math.random() * radius * (0.2 + Math.random() * 0.9);
-                        const bx = Math.cos(ang) * r;
-                        const bz = Math.sin(ang) * r;
-                        const baseY = this._sampleGroundHeight(cx + bx, cz + bz);
-                        const h = 1 + Math.floor(Math.random() * 8) + (Math.random() < 0.08 ? 8 + Math.random() * 24 : 0);
-                        const bw = 0.8 + Math.random() * 2.6;
-                        const geo = new THREE.BoxGeometry(bw, h, bw);
-                        const mat = new THREE.MeshStandardMaterial({
-                            color: new THREE.Color(0.12 + Math.random() * 0.25, 0.12 + Math.random() * 0.25, 0.14 + Math.random() * 0.26),
-                            roughness: 0.8,
-                            metalness: 0.02
-                        });
-                        const bmesh = new THREE.Mesh(geo, mat);
-                        bmesh.position.set(bx, baseY + h / 2, bz);
-                        bmesh.castShadow = true;
-                        bmesh.receiveShadow = true;
-                        city.buildings.push(bmesh);
-                        city.group.add(bmesh);
+                    // Industrial zone with large warehouse buildings
+                    if (city.isIndustrial) {
+                        for (let w = 0; w < 6; w++) {
+                            const ang = Math.random() * Math.PI * 2;
+                            const r = Math.random() * radius * 0.5 + 8;
+                            const bx = Math.cos(ang) * r;
+                            const bz = Math.sin(ang) * r;
+                            const baseY = this._sampleGroundHeight(cx + bx, cz + bz);
+                            const h = 6 + Math.random() * 12; // large warehouse heights
+                            const bw = 8 + Math.random() * 18; // large footprints
+                            const geo = new THREE.BoxGeometry(bw, h, bw * 0.6);
+                            const bmesh = new THREE.Mesh(geo, industrialMat.clone());
+                            bmesh.position.set(bx, baseY + h / 2, bz);
+                            bmesh.castShadow = true;
+                            bmesh.receiveShadow = true;
+                            city.buildings.push(bmesh);
+                            city.group.add(bmesh);
+                            
+                            // Industrial lights: sparse and dim
+                            if (Math.random() < 0.4) {
+                                const lgeo = new THREE.PlaneGeometry(bw * 0.7, h * 0.08);
+                                const lmat = new THREE.MeshBasicMaterial({ color: 0xffdd99, transparent: true, opacity: 0.0, depthWrite: false });
+                                const lmesh = new THREE.Mesh(lgeo, lmat);
+                                const side = Math.random() > 0.5 ? 1 : -1;
+                                lmesh.position.set(bx + side * (bw / 2 + 0.02), baseY + h * 0.35, bz);
+                                lmesh.rotation.y = side === 1 ? -Math.PI / 2 : Math.PI / 2;
+                                lmesh.userData = { baseOpacity: 0.6 + Math.random() * 0.3, flicker: Math.random() * 0.8 };
+                                city.lights.push(lmesh);
+                                city.group.add(lmesh);
+                            }
+                        }
+                    } else {
+                        // Residential zone with mixed buildings
+                        for (let b = 0; b < density; b++) {
+                            const ang = Math.random() * Math.PI * 2;
+                            const r = Math.random() * radius * (0.25 + Math.random() * 0.85);
+                            const bx = Math.cos(ang) * r;
+                            const bz = Math.sin(ang) * r;
+                            const baseY = this._sampleGroundHeight(cx + bx, cz + bz);
+                            const h = 2 + Math.floor(Math.random() * 9) + (Math.random() < 0.12 ? 8 + Math.random() * 28 : 0);
+                            const bw = 1.2 + Math.random() * 3.2;
+                            const geo = new THREE.BoxGeometry(bw, h, bw);
+                            const col = new THREE.Color(0.16 + Math.random() * 0.3, 0.14 + Math.random() * 0.28, 0.16 + Math.random() * 0.3);
+                            const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.8, metalness: 0.02 });
+                            const bmesh = new THREE.Mesh(geo, mat);
+                            bmesh.position.set(bx, baseY + h / 2, bz);
+                            bmesh.castShadow = true;
+                            bmesh.receiveShadow = true;
+                            city.buildings.push(bmesh);
+                            city.group.add(bmesh);
 
-                        // create a simple emissive window plane for night lights (pooled)
-                        if (Math.random() < 0.6) {
-                            const lightGeo = new THREE.PlaneGeometry(bw * 0.6, h * 0.12);
-                            const lightMat = new THREE.MeshBasicMaterial({ color: 0xffeaa7, transparent: true, opacity: 0.0, depthWrite: false });
-                            const lmesh = new THREE.Mesh(lightGeo, lightMat);
-                            const side = Math.random() > 0.5 ? 1 : -1;
-                            lmesh.position.set(bx + side * (bw / 2 + 0.01), baseY + h * (0.2 + Math.random() * 0.6), bz);
-                            lmesh.rotation.y = side === 1 ? -Math.PI / 2 : Math.PI / 2;
-                            lmesh.userData = { baseOpacity: 0.9 + Math.random() * 0.4, flicker: Math.random() * 0.6 };
-                            city.lights.push(lmesh);
-                            city.group.add(lmesh);
+                            // Windows with night lights
+                            if (Math.random() < 0.65) {
+                                const lightGeo = new THREE.PlaneGeometry(bw * 0.65, h * 0.14);
+                                const lightMat = new THREE.MeshBasicMaterial({ color: 0xffeaa7, transparent: true, opacity: 0.0, depthWrite: false });
+                                const lmesh = new THREE.Mesh(lightGeo, lightMat);
+                                const side = Math.random() > 0.5 ? 1 : -1;
+                                lmesh.position.set(bx + side * (bw / 2 + 0.015), baseY + h * (0.25 + Math.random() * 0.5), bz);
+                                lmesh.rotation.y = side === 1 ? -Math.PI / 2 : Math.PI / 2;
+                                lmesh.userData = { baseOpacity: 0.95 + Math.random() * 0.35, flicker: Math.random() * 0.6 };
+                                city.lights.push(lmesh);
+                                city.group.add(lmesh);
+                            }
                         }
                     }
 
-                    // create a short local road loop and spawn vehicles that follow simple circular paths
-                    const vehicleCount = 3 + Math.floor(Math.random() * 6);
+                    // Vehicles on roads
+                    const vehicleCount = 4 + Math.floor(Math.random() * 8);
                     for (let v = 0; v < vehicleCount; v++) {
                         const angle = Math.random() * Math.PI * 2;
-                        const R = Math.max(6, radius * (0.35 + Math.random() * 0.5));
-                        const vehicleGeo = new THREE.BoxGeometry(0.9, 0.4, 1.6);
-                        const vehicleMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random()*0.8+0.1, Math.random()*0.8+0.1, Math.random()*0.8+0.1), roughness: 0.6 });
+                        const R = Math.max(8, radius * (0.4 + Math.random() * 0.55));
+                        const vehicleGeo = new THREE.BoxGeometry(1.0, 0.45, 1.8);
+                        const vehicleCol = new THREE.Color(Math.random()*0.8+0.15, Math.random()*0.8+0.15, Math.random()*0.8+0.15);
+                        const vehicleMat = new THREE.MeshStandardMaterial({ color: vehicleCol, roughness: 0.6 });
                         const vehicle = new THREE.Mesh(vehicleGeo, vehicleMat);
                         const vx = Math.cos(angle) * R;
                         const vz = Math.sin(angle) * R;
-                        const vy = this._sampleGroundHeight(cx + vx, cz + vz) + 0.3;
+                        const vy = this._sampleGroundHeight(cx + vx, cz + vz) + 0.35;
                         vehicle.position.set(vx, vy, vz);
-                        vehicle.userData = {
-                            cityCenter: { x: cx, z: cz },
-                            radius: R,
-                            angle,
-                            speed: 0.002 + Math.random() * 0.006,
-                            offsetY: vy
-                        };
+                        vehicle.userData = { cityCenter: { x: cx, z: cz }, radius: R, angle, speed: 0.003 + Math.random() * 0.008, offsetY: vy };
                         city.group.add(vehicle);
                         this.vehicles.push(vehicle);
                     }
 
-                    // spawn pedestrians/humans as small low-poly agents that wander near roads/buildings
-                    const pedCount = 6 + Math.floor(Math.random() * 18);
+                    // Pedestrians
+                    const pedCount = 8 + Math.floor(Math.random() * 22);
                     for (let p = 0; p < pedCount; p++) {
-                        const px = (Math.random() - 0.5) * radius * 0.9;
-                        const pz = (Math.random() - 0.5) * radius * 0.9;
-                        const py = this._sampleGroundHeight(cx + px, cz + pz) + 0.18;
-                        const pedGeo = new THREE.SphereGeometry(0.18, 6, 6);
-                        const pedMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0.95, 0.7, 0.6), roughness: 0.9 });
+                        const px = (Math.random() - 0.5) * radius * 0.95;
+                        const pz = (Math.random() - 0.5) * radius * 0.95;
+                        const py = this._sampleGroundHeight(cx + px, cz + pz) + 0.2;
+                        const pedGeo = new THREE.SphereGeometry(0.2, 6, 6);
+                        const pedMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0.96, 0.72, 0.62), roughness: 0.9 });
                         const ped = new THREE.Mesh(pedGeo, pedMat);
                         ped.position.set(px, py, pz);
-                        ped.userData = {
-                            cityCenter: { x: cx, z: cz },
-                            roamRadius: Math.max(3, radius * 0.6),
-                            angle: Math.random() * Math.PI * 2,
-                            speed: 0.0006 + Math.random() * 0.0016
-                        };
+                        ped.userData = { cityCenter: { x: cx, z: cz }, roamRadius: Math.max(4, radius * 0.65), angle: Math.random() * Math.PI * 2, speed: 0.0008 + Math.random() * 0.0022 };
                         city.group.add(ped);
                         this.pedestrians.push(ped);
                     }
@@ -1966,9 +2160,11 @@
                 // Seed initial puffs immediately so new clouds appear with full structure
                 {
                     const seedCount = 6 + Math.floor(Math.min(8, Math.max(0, c.mass)));
+                    // FIXED: Scale footprint by all structural factors so spawn area matches visible cloud
+                    const footprint = Math.max(3.6, (c.radius || 6) * (c.horizontalSpread || 1.0) * (c.widthFactor || 1.0));
+                    const spread = Math.max(1.6, footprint * (0.8 + Math.random() * 0.6));
                     for (let si = 0; si < seedCount; si++) {
                         const a = Math.random() * Math.PI * 2;
-                        const spread = Math.max(1.6, c.radius * (0.8 + Math.random() * 0.6));
                         const px = Math.cos(a) * spread;
                         const pz = Math.sin(a) * spread;
                         const baseH = c.height || (c.baseHeight + 0.8);
@@ -1977,7 +2173,11 @@
                         const turb = Math.min(0.9, c.turbulence || 0.12);
                         const size = (1.6 + Math.random() * 2.6) * (c.stage === 'cumulonimbus' ? 1.4 : 1.0);
                         const puff = this.makePuff(px, ph, pz, size, dark, turb, undefined);
-                        // place relative to cloud group and allow fade-in handling
+                        // NEW: Add development animation metadata to puff
+                        puff.userData = puff.userData || {};
+                        puff.userData.growthPhase = 0; // 0-1 for animation
+                        puff.userData.targetScale = puff.scale.length();
+                        puff.scale.multiplyScalar(0.4); // start small, grow in
                         c.puffs.push(puff);
                         c.grp.add(puff);
                     }
@@ -2379,13 +2579,13 @@
                             c.hasAnvil = false;
                             c.anvilTimer = 0;
                         }
-                        // Anvil forms more readily in high-shear environments
-                        const anvilFormChance = 0.06 * (1 + shearMag * 0.3);
+                        // Anvil forms more readily in high-shear environments (IMPROVED: lower threshold)
+                        const anvilFormChance = 0.12 * (1 + shearMag * 0.3); // INCREASED from 0.06
                         if (!c.hasAnvil && Math.random() < anvilFormChance) {
                             c.hasAnvil = true;
                             c.anvilTimer = 350 + Math.floor(Math.random() * 500);
                             // broader anvil in high-shear regimes
-                            const anvilCount = 5 + Math.floor(Math.min(20, c.radius * 1.1 * (1 + shearMag)));
+                            const anvilCount = 8 + Math.floor(Math.min(20, c.radius * 1.1 * (1 + shearMag))); // MORE anvil puffs
                             for (let ai = 0; ai < anvilCount; ai++) {
                                 const ax = (Math.random() - 0.5) * c.radius * (2.4 + shearMag * 0.5 + Math.random() * 1.5);
                                 const az = (Math.random() - 0.5) * c.radius * (2.4 + shearMag * 0.5 + Math.random() * 1.5);
@@ -2400,6 +2600,10 @@
                                 anvilPuff.position.set(ax, (ay - cloudTopY), az);
                                 anvilPuff.userData.isAnvil = true;
                                 anvilPuff.userData.localYOffset = anvilPuff.position.y;
+                                // NEW: Anvil development animation
+                                anvilPuff.userData.growthPhase = 0;
+                                anvilPuff.userData.targetScale = anvilPuff.scale.clone();
+                                anvilPuff.scale.multiplyScalar(0.3);
                                 c.puffs.push(anvilPuff);
                                 c.grp.add(anvilPuff);
                             }
@@ -2408,7 +2612,7 @@
                         if (c.hasAnvil) {
                             c.anvilTimer--;
                             // Refresh anvil structure more frequently in high-shear cases
-                            const refreshChance = 0.45 + shearMag * 0.3;
+                            const refreshChance = 0.65 + shearMag * 0.3; // INCREASED from 0.45
                             if (c.anvilTimer % 70 === 0 && Math.random() < refreshChance) {
                                 const ax = (Math.random() - 0.5) * c.radius * (1.7 + shearMag * 0.3);
                                 const az = (Math.random() - 0.5) * c.radius * (1.7 + shearMag * 0.3);
@@ -2422,11 +2626,15 @@
                                 anvilWisp.position.set(ax, (ay - cloudTopY2), az);
                                 anvilWisp.userData.isAnvil = true;
                                 anvilWisp.userData.localYOffset = anvilWisp.position.y;
+                                // NEW: Anvil wisp animation
+                                anvilWisp.userData.growthPhase = 0;
+                                anvilWisp.userData.targetScale = anvilWisp.scale.clone();
+                                anvilWisp.scale.multiplyScalar(0.2);
                                 c.puffs.push(anvilWisp);
                                 c.grp.add(anvilWisp);
                             }
                             // Anvil precipitation sourcing slightly enhanced by shear
-                            if (AppState.rainSystem && Math.random() < (0.065 + shearMag * 0.02)) {
+                            if (AppState.rainSystem && Math.random() < (0.1 + shearMag * 0.02)) { // INCREASED from 0.065
                                 try { AppState.rainSystem.spawnDropFromCloud(c); } catch(e) {}
                             }
                             if (c.anvilTimer <= 0 || Math.random() < 0.007) {
@@ -2541,6 +2749,10 @@
                                     clone.userData.vy = 0.02 + Math.min(0.12, localUpdraft * 0.03);
                                     clone.userData.spreadSpeed = 0.008 + Math.random() * 0.02;
                                     clone.userData.maxRise = Math.max(3.0, (c.cloudTop || c.height || 0) + 4.0);
+                                    // NEW: Add growth phase animation to clones
+                                    clone.userData.growthPhase = 0;
+                                    clone.userData.targetScale = clone.scale.clone();
+                                    clone.scale.multiplyScalar(0.5);
                                     clone.material && (clone.material.opacity = Math.min(0.9, clone.material.opacity || 0.35));
                                     c.puffs.push(clone);
                                     c.grp.add(clone);
@@ -2570,12 +2782,26 @@
                                 }
                             }
 
+                            // NEW: Cloud development animation - puffs grow in as they're created
+                            if (p.userData && p.userData.growthPhase !== undefined) {
+                                p.userData.growthPhase = Math.min(1, p.userData.growthPhase + 0.08);
+                                const growthEase = p.userData.growthPhase * p.userData.growthPhase; // ease-in
+                                if (p.userData.targetScale) {
+                                    p.scale.copy(p.userData.targetScale).multiplyScalar(0.3 + growthEase * 0.7);
+                                }
+                            }
+
+                            // IMPROVED: Dissipation effects - more gradual, nuanced fading
                             if (c.dying) {
                                 const dd = p.userData && p.userData.dissipate ? p.userData.dissipate : 0.035;
                                 if (p.material && typeof p.material.opacity === 'number') {
                                     p.material.opacity = Math.max(0, (p.material.opacity || 1) - dd * 0.85);
                                 }
-                                if (p.scale) p.scale.multiplyScalar(Math.max(0.98, 1 - dd * 0.9));
+                                if (p.scale) {
+                                    // slow scale decay rather than sharp drop (smoother dissipation)
+                                    const scaleFade = Math.max(0.85, 1 - dd * 1.2);
+                                    p.scale.multiplyScalar(scaleFade);
+                                }
                                 const fallVy = p.userData && p.userData.vy ? p.userData.vy : 0.004;
                                 p.position.y = Math.max(0.6, p.position.y - fallVy * 7);
                             } else {
@@ -2788,7 +3014,7 @@
                 this.cloudSystemRef = cloudSystemRef;
 
                 // particle pool parameters (increased for heavier precipitation)
-                this.max = 2500;
+                this.max = 3500;
                 this.drops = new Array(this.max).fill(null).map(()=>({ active: false }));
                 this.pos = new Float32Array(this.max * 3);
                 this.vel = new Array(this.max).fill(null).map(()=>({ y:0, vx:0, vz:0 }));
@@ -2853,7 +3079,7 @@
                 const canvas = document.createElement('canvas');
                 // larger canvas to allow smooth anti-aliased streak with rounded ends
                 canvas.width = 32;
-                canvas.height = 192;
+                canvas.height = 256;
                 const ctx = canvas.getContext('2d', { alpha: true });
                 // ensure strokes/rendering use rounded caps to avoid square dot artifacts
                 try { ctx.lineCap = 'round'; ctx.lineJoin = 'round'; } catch(e){}
@@ -2869,10 +3095,10 @@
                 ctx.save();
                 // vertical gradient for smooth fade
                 const grad = ctx.createLinearGradient(0, y, 0, y + h);
-                grad.addColorStop(0.0, 'rgba(255,255,255,0.98)');
-                grad.addColorStop(0.12, 'rgba(220,240,255,0.9)');
-                grad.addColorStop(0.38, 'rgba(170,210,235,0.7)');
-                grad.addColorStop(0.82, 'rgba(120,170,210,0.28)');
+                grad.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+                grad.addColorStop(0.15, 'rgba(220,240,255,0.95)');
+                grad.addColorStop(0.4, 'rgba(170,210,235,0.7)');
+                grad.addColorStop(0.75, 'rgba(120,170,210,0.3)');
                 grad.addColorStop(1.0, 'rgba(120,170,210,0.0)');
                 ctx.fillStyle = grad;
 
@@ -2917,15 +3143,15 @@
                 // Use Points material but configured for elongated streak sprites with sizeAttenuation,
                 // higher base opacity and additive blending for heavier, realistic streaks.
                 this.material = new THREE.PointsMaterial({
-                    size: 1.6,
+                    size: 2.2,
                     map: streakTex,
                     transparent: true,
-                    opacity: 0.88,
+                    opacity: 0.92,
                     depthWrite: false,
                     blending: THREE.AdditiveBlending,
                     vertexColors: false,
                     sizeAttenuation: true,
-                    alphaTest: 0.02
+                    alphaTest: 0.01
                 });
 
                 this.rain = new THREE.Points(geo, this.material);
@@ -2933,16 +3159,16 @@
                 // Keep points visible as streak sprites; size will be modulated by drop size at runtime.
 
                 // create a larger, more visible streak system and de-emphasize point sprites
-                this.streakMax = 1200; // increased streak capacity for longer continuous streaks
+                this.streakMax = 2000; // increased streak capacity for longer continuous streaks
                 this.createStreakSystem();
 
                 // microphysics tuning (adjusted for heavier precipitation)
                 this.params = {
-                    globalSlowFactor: 0.78,   // moderate slow-down but not too low (keeps heavy look)
-                    coalesceProb: 0.012,      // higher chance to merge -> bigger drops
-                    breakProb: 0.0012,        // fragmentation of very large drops remains rare
-                    splashParticles: 26,      // more splashes for heavier impacts
-                    evaporationRate: 0.0007   // slight reduction so drops survive longer
+                    globalSlowFactor: 0.75,   // moderate slow-down but not too low (keeps heavy look)
+                    coalesceProb: 0.015,      // higher chance to merge -> bigger drops
+                    breakProb: 0.001,        // fragmentation of very large drops remains rare
+                    splashParticles: 40,      // more splashes for heavier impacts
+                    evaporationRate: 0.0006   // slight reduction so drops survive longer
                 };
                 // make the system more aggressive for realistic heavy precipitation visuals
                 this.params.coalesceProb *= 1.9; // more coalescence -> larger drops
@@ -3108,99 +3334,126 @@
 
             // spawn a single drop with microphysics-driven initial conditions based on cloud
             spawnDropFromCloud(cloud) {
+                // Replace point-drop spawning with a volumetric rainfall sheet / shaft tied to the cloud.
+                // If a shaft already exists for this cloud, update its intensity/position; otherwise create one.
                 if (!cloud) return;
-                // bias spawn by cloud properties but allow continuous seeding for dying clouds at lower rate
-                const stage = cloud.stage || 'cumulus';
-                const stageBias = stage === 'supercell' ? 2.2 : (stage === 'cumulonimbus' ? 1.6 : (stage === 'towering_cumulus' ? 1.05 : 0.36));
-                const baseSpawnChance = Math.min(1.6, (cloud.mass / 5.5) * stageBias);
-                if (cloud.dying && Math.random() > 0.5) return; // dying clouds spawn less often
+                try {
+                    // compute a visually appropriate shaft footprint (match cloud radius / spread)
+                    const footprint = Math.max(4.0, (cloud.radius || 6) * (cloud.horizontalSpread || 1.0) * (cloud.widthFactor || 1.0));
+                    const shaftRadius = footprint * 1.2;
+                    const shaftHeight = Math.max(6, (cloud.cloudTop || cloud.height || 18));
+                    const intensity = Math.min(1.0, Math.max(0.06, (cloud.condensationLevel || 0.4) * Math.min(4, (cloud.mass || 1) / 4)));
 
-                // find free slot
-                for (let i = 0; i < this.max; i++) {
-                    if (!this.drops[i].active) {
-                        const idx = i * 3;
-                        // position within cloud footprint with small jitter
-                        const angle = Math.random() * Math.PI * 2;
-                        // scale sampling radius by cloud footprint, horizontal spread, width factor and mass so precipitation area follows cloud structure
-                        const footprint = Math.max(3.6, (cloud.radius || 6) * (cloud.horizontalSpread || 1.0) * (cloud.widthFactor || 1.0));
-                        const r = Math.random() * (footprint * (0.8 + Math.random()*0.9)) * (1 + Math.min(1.8, (cloud.mass||0)/6));
-                        const cx = cloud.x + Math.cos(angle) * r + (Math.random()-0.5)*0.6;
-                        const cz = cloud.z + Math.sin(angle) * r + (Math.random()-0.5)*0.6;
-                        // default start height near cloud height
-                        let startH = Math.max(1, (cloud.height || 18) - (0.2 + Math.random()*1.2));
-                        
-                        // Detect mid/high-level cloud types and bias to produce virga:
-                        // altocumulus / altostratus and cirrus families spawn higher, smaller drops with lower quality
-                        const variant = cloud.variant || cloud.stage || '';
-                        const isAlto = /alto/i.test(variant) || /altocumulus|altostratus/i.test(variant) || (variant === 'altocumulus' || variant === 'altostratus');
-                        const isCirrus = /cirr/i.test(variant) || variant.startsWith('cirrus');
-                        if (isAlto) {
-                            // altocumulus/altostratus: mid-level precipitation that often evaporates below
-                            startH = (cloud.height || 26) + 6 + Math.random() * 6; // spawn noticeably higher
-                        } else if (isCirrus) {
-                            // cirrus-family: very high and thin fallstreaks -> virga almost always
-                            startH = (cloud.height || 34) + 8 + Math.random() * 12;
+                    let shaft = this.cloudShafts.get(cloud);
+                    if (!shaft) {
+                        // create grouped layered translucent shells to approximate a volumetric continuous sheet
+                        shaft = new THREE.Group();
+                        const segmentCount = 10;
+                        for (let s = 0; s < segmentCount; s++) {
+                            const t = s / Math.max(1, segmentCount - 1);
+                            const segRadius = shaftRadius * (0.9 + (Math.sin(t * Math.PI) * 0.06));
+                            const segHeight = shaftHeight * (0.9 + t * 0.3);
+                            const geo = new THREE.CylinderGeometry(segRadius, segRadius * 0.85, Math.max(0.6, segHeight / segmentCount), 36, 1, true);
+                            geo.translate(0, -segHeight * 0.5 + s * (segHeight / segmentCount), 0);
+                            const mat = new THREE.MeshStandardMaterial({
+                                color: new THREE.Color(0x92cfe8),
+                                transparent: true,
+                                opacity: 0.08 + intensity * 0.36 * (1 - t * 0.6),
+                                depthWrite: false,
+                                side: THREE.DoubleSide,
+                                blending: THREE.AdditiveBlending,
+                                roughness: 0.9,
+                                metalness: 0.02
+                            });
+                            const mesh = new THREE.Mesh(geo, mat);
+                            mesh.frustumCulled = false;
+                            shaft.add(mesh);
                         }
-
-                        this.pos[idx] = cx;
-                        this.pos[idx+1] = startH + (Math.random()-0.5) * 0.5;
-                        this.pos[idx+2] = cz;
-
-                        // determine type, microphysical quality influences size distribution
-                        const ptype = this.determinePrecipType(startH);
-                        this.type[i] = ptype;
-
-                        // quality: droplet concentration or snowflake porosity (0.5..1.8)
-                        // for alto/cirrus make quality lower so evaporation is more likely
-                        let quality = 0.6 + Math.random() * 1.4 + Math.min(1.0, cloud.condensationLevel || 0);
-                        if (isAlto) quality *= 0.62; // drier/smaller drops
-                        if (isCirrus) quality *= 0.45; // very low-density fallstreaks
-                        this.quality[i] = quality;
-
-                        // size scales with cloud mass, condensation, and stage (boosted for heavier precipitation)
-                        const massFactor = Math.max(0.7, Math.min(3.6, 0.7 + (cloud.mass || 0) * 0.14));
-                        const condFactor = 0.9 + (cloud.condensationLevel || 0) * 1.25;
-                        let s = 1.2 * massFactor * condFactor * (stageBias * (0.8 + Math.random()*1.0));
-                        // for alto/cirrus reduce visual drop size significantly to favor virga
-                        if (isAlto) s *= 0.42 + Math.random()*0.32;
-                        if (isCirrus) s *= 0.22 + Math.random()*0.28;
-
-                        // modify by type (snowflakes often larger visual but slower)
-                        let fallSpeed;
-                        if (ptype === 'snow') {
-                            s *= 1.2 + Math.random()*1.4;
-                            fallSpeed = (0.04 + (s / 5) * 0.06) * (1 + Math.random()*0.45);
-                        } else if (ptype === 'sleet') {
-                            s *= 1.0 + Math.random()*1.1;
-                            fallSpeed = (0.14 + (s / 4) * 0.2) * (1 + Math.random()*0.45);
-                        } else if (ptype === 'freezing_rain') {
-                            s *= 1.0 + Math.random()*1.8;
-                            fallSpeed = (0.18 + (s / 4) * 0.26) * (1 + Math.random()*0.45);
-                        } else {
-                            // rain
-                            // make rain visually heavier & more physical: larger drops and faster terminal velocities
-                            s *= 2.0 * (1.1 + Math.random()*2.4); // doubled baseline size
-                            // more realistic fall-speed scaling (approximate terminal velocity scaling)
-                            fallSpeed = (0.45 + (s / 3.5) * 0.9) * (0.9 + Math.random()*0.36);
-                            fallSpeed *= Math.max(0.6, this.params.globalSlowFactor * 0.95);
+                        shaft.userData.pcnt = Math.max(160, Math.floor(shaftRadius * 9));
+                        shaft.userData.intensity = intensity;
+                        shaft.position.set(cloud.x || 0, 0, cloud.z || 0);
+                        shaft.frustumCulled = false;
+                        this.rainshaftGroup.add(shaft);
+                        this.cloudShafts.set(cloud, shaft);
+                    } else {
+                        // update existing shaft position and per-segment opacity to reflect new intensity
+                        shaft.position.x = cloud.x;
+                        shaft.position.z = cloud.z;
+                        shaft.userData.intensity = intensity;
+                        for (let i = 0; i < shaft.children.length; i++) {
+                            const ch = shaft.children[i];
+                            if (ch && ch.material) {
+                                const t = i / Math.max(1, shaft.children.length - 1);
+                                ch.material.opacity = Math.max(0.03, 0.08 + intensity * 0.36 * (1 - t * 0.6));
+                            }
                         }
-
-                        // For alto/cirrus lower fall speeds (small particles) to increase chance of evaporation
-                        if (isAlto) fallSpeed *= 0.62;
-                        if (isCirrus) fallSpeed *= 0.38;
-
-                        // set properties
-                        this.size[i] = Math.max(0.14, s * (0.22 + Math.min(0.7, stageBias*0.16)));
-                        this.vel[i].y = fallSpeed;
-                        // small initial horizontal vel from cloud turbulence/wind
-                        const windCell = this.windFieldRef.getAt(this.pos[idx], this.pos[idx+1], this.pos[idx+2]);
-                        this.vel[i].vx = (windCell.x || 0) * (0.7 + Math.random()*0.9) * (1 + (cloud.turbulence || 0));
-                        this.vel[i].vz = (windCell.z || 0) * (0.7 + Math.random()*0.9) * (1 + (cloud.turbulence || 0));
-                        this.age[i] = 0;
-                        this.life[i] = 1.0;
-                        this.drops[i] = { active: true };
-                        break;
                     }
+                } catch (err) {
+                    // fallback: keep function safe – silently ignore failures
+                    console.warn('spawnDropFromCloud -> shaft spawn failed', err);
+                }
+            }
+
+            // NEW: spawn actual precipitation particles into the particle pool from a cloud (visible drops/streaks)
+            spawn(cloud) {
+                if (!cloud) return;
+                try {
+                    // Find an inactive slot and seed a drop at a random position within the cloud footprint
+                    const footprint = Math.max(3.0, (cloud.radius || 6) * (cloud.horizontalSpread || 1.0));
+                    // attempt to spawn multiple drops per call for visible effect
+                    const spawnCount = 2 + Math.floor(Math.min(6, (cloud.mass || 1) * 0.5));
+                    for (let s = 0; s < spawnCount; s++) {
+                        for (let i = 0; i < this.max; i++) {
+                            if (!this.drops[i].active) {
+                                const idx = i * 3;
+                                // local sample within cloud footprint biased toward dense puffs
+                                const angle = Math.random() * Math.PI * 2;
+                                const radius = Math.random() * footprint * (0.3 + Math.random() * 0.9);
+                                const x = cloud.x + Math.cos(angle) * radius + (Math.random()-0.5)*0.6;
+                                const z = cloud.z + Math.sin(angle) * radius + (Math.random()-0.5)*0.6;
+                                // Ensure drops are not visibly spawned inside dense puff geometry:
+                                // sample puff density at candidate location and, if high, place the initial Y just below the cloud base
+                                const sampleY = Math.max(1.0, (cloud.height || cloud.cloudTop || 18) - (Math.random() * Math.min(6, footprint * 0.12)));
+                                let initialY = sampleY;
+                                try {
+                                    const puffDensity = (AppState.cloudSystem && typeof AppState.cloudSystem.getPuffDensityAt === 'function')
+                                        ? AppState.cloudSystem.getPuffDensityAt(x, sampleY, z)
+                                        : 0;
+                                    // if the density indicates the point is inside or too close to puffs, start drops just below cloud base
+                                    if (puffDensity > 0.12) {
+                                        initialY = Math.max(0.9, (cloud.cloudBase || (cloud.baseHeight || 8)) - 0.6);
+                                    }
+                                } catch (e) {
+                                    initialY = sampleY;
+                                }
+                                const y = initialY;
+                                this.pos[idx] = x;
+                                this.pos[idx + 1] = y;
+                                this.pos[idx + 2] = z;
+                                // initial vertical speed depends on drop size and cloud updraft
+                                const baseSize = Math.min(1.8, 0.6 + (cloud.condensationLevel || 0.35) * 2.4 + Math.random() * 0.9);
+                                this.size[i] = baseSize;
+                                this.vel[i].y = 0.6 + Math.random() * 0.6 + (baseSize * 0.2);
+                                this.vel[i].vx = (Math.random() - 0.5) * 0.08;
+                                this.vel[i].vz = (Math.random() - 0.5) * 0.08;
+                                this.type[i] = this.determinePrecipType(cloud.height || 12);
+                                this.drops[i].active = true;
+                                this.age[i] = 0;
+                                this.life[i] = 1.0;
+                                this.quality[i] = 1.0;
+                                this.dragCoeff[i] = 0.47;
+                                this.density[i] = 1.0;
+                                break;
+                            }
+                        }
+                    }
+                    // Ensure geometry attribute updates are flagged so new drops are rendered immediately
+                    if (this.rain && this.rain.geometry && this.rain.geometry.attributes.position) {
+                        this.rain.geometry.attributes.position.needsUpdate = true;
+                        if (this.rain.geometry.attributes.size) this.rain.geometry.attributes.size.needsUpdate = true;
+                    }
+                } catch (err) {
+                    console.warn('Precipitation.spawn failed', err);
                 }
             }
 
@@ -3415,10 +3668,11 @@
                             const density = AppState.cloudSystem && typeof AppState.cloudSystem.getPuffDensityAt === 'function' ? AppState.cloudSystem.getPuffDensityAt(sampleX, sampleY, sampleZ) : 0.5;
                             // require a minimum local puff density or reduce spawn chance strongly
                             if (density > 0.08 || Math.random() < Math.min(0.22, density + 0.06)) {
-                                this.spawnDropFromCloud(c);
+                                // spawn actual precipitation particles (drops/streaks) instead of only creating shafts
+                                this.spawn(c);
                             }
                         } catch (e) {
-                            this.spawnDropFromCloud(c);
+                            this.spawn(c);
                         }
                     }
 
@@ -3788,39 +4042,39 @@
                 this.bolts = [];
                 this.charge = 0;
                 // Raise threshold and make accumulation slower so strikes are less frequent
-                this.threshold = 220;
+                this.threshold = 200;
                 this.last = 0;
                 this.count = 0;
-                this.flash = new THREE.PointLight(0xddeeff, 0, 200);
+                this.flash = new THREE.PointLight(0xeef5ff, 0, 300); // increased range
                 AppState.scene.add(this.flash);
                 this.enabled = true;
                 // store per-cloud charge reservoirs
                 this._cloudCharge = new WeakMap();
+                this.ambientFlash = null; // scene-wide brief bright flash for dramatic effect
             }
 
             createSteppedLeader(sx, sy, sz, ex, ey, ez) {
-                const segments = [];
-                const steps = 25 + Math.floor(Math.random() * 10);
+                const segments = 35 + Math.floor(Math.random() * 15); // more segments for detail
                 let currentX = sx, currentY = sy, currentZ = sz;
+                const path = [];
                 
-                for (let i = 0; i < steps; i++) {
-                    const t = i / steps;
+                for (let i = 0; i < segments; i++) {
+                    const t = i / segments;
                     const targetX = sx + (ex - sx) * t;
-                    const targetY = sy + (ey - sy) * t - Math.pow(t, 1.5) * 5;
+                    const targetY = sy + (ey - sy) * t - Math.pow(t, 1.4) * 8; // deeper sag
                     const targetZ = sz + (ez - sz) * t;
                     
-                    // Stepped leader movement
-                    const stepSize = 2 + Math.random() * 3;
-                    const chaos = (1 - Math.abs(t - 0.5) * 2) * 6;
+                    const stepSize = 2.5 + Math.random() * 3.5;
+                    const chaos = (1 - Math.abs(t - 0.5) * 2) * 8;
                     
-                    currentX += (targetX - currentX) * 0.3 + (Math.random() - 0.5) * chaos;
-                    currentY += (targetY - currentY) * 0.3 + (Math.random() - 0.5) * stepSize;
-                    currentZ += (targetZ - currentZ) * 0.3 + (Math.random() - 0.5) * chaos;
+                    currentX += (targetX - currentX) * 0.25 + (Math.random() - 0.5) * chaos;
+                    currentY += (targetY - currentY) * 0.25 + (Math.random() - 0.5) * stepSize;
+                    currentZ += (targetZ - currentZ) * 0.25 + (Math.random() - 0.5) * chaos;
                     
-                    segments.push(new THREE.Vector3(currentX, currentY, currentZ));
+                    path.push(new THREE.Vector3(currentX, currentY, currentZ));
                 }
                 
-                return segments;
+                return path;
             }
 
             createBranch(originPoint, depth = 0, maxDepth = 3) {
@@ -3873,16 +4127,16 @@
             }
 
             makeBolt(sx, sy, sz, ex, ey, ez) {
-                // Main channel with stepped leader
+                // Main channel with stepped leader and multiple glow layers
                 const mainPath = this.createSteppedLeader(sx, sy, sz, ex, ey, ez);
- 
-                // Create multi-width core stroke (main + wider glow) for visual depth
+                
+                // Core bright white
                 const mainGeom = new THREE.BufferGeometry().setFromPoints(mainPath);
                 const mainMat = new THREE.LineBasicMaterial({
                     color: 0xffffff,
                     transparent: true,
-                    opacity: 1,
-                    linewidth: 3
+                    opacity: 1.0,
+                    linewidth: 4
                 });
                 const mainBolt = new THREE.Line(mainGeom, mainMat);
                 mainBolt.userData.life = 1.0;
@@ -3890,65 +4144,41 @@
                 AppState.scene.add(mainBolt);
                 this.bolts.push(mainBolt);
 
-                // layered glow / bloom lines for thickness and temporal variance
-                const glowGeom = new THREE.BufferGeometry().setFromPoints(mainPath);
-                const glowMat = new THREE.LineBasicMaterial({
-                    color: 0x9fe6ff,
-                    transparent: true,
-                    opacity: 0.45,
-                    linewidth: 9
-                });
-                const glow = new THREE.Line(glowGeom, glowMat);
-                glow.userData.life = 0.9;
-                AppState.scene.add(glow);
-                this.bolts.push(glow);
+                // Multiple glow layers for depth
+                for (let g = 0; g < 3; g++) {
+                    const glowGeom = new THREE.BufferGeometry().setFromPoints(mainPath);
+                    const glowColor = [0xccddff, 0x99bbff, 0x6699ff][g];
+                    const glowMat = new THREE.LineBasicMaterial({
+                        color: glowColor,
+                        transparent: true,
+                        opacity: [0.5, 0.35, 0.2][g],
+                        linewidth: [14, 10, 6][g]
+                    });
+                    const glow = new THREE.Line(glowGeom, glowMat);
+                    glow.userData.life = 0.85 + g * 0.05;
+                    AppState.scene.add(glow);
+                    this.bolts.push(glow);
+                }
 
-                // remove sparkle "beads" points - replaced by subtle glow only (avoid bright white dots)
-                // (previous bead points creation removed to eliminate distracting white dots)
-
-                // Create complex branching from multiple points with variable depth & jittered directions
-                const sampleCount = Math.max(3, Math.floor(mainPath.length * 0.18));
+                // Enhanced branching with more natural spread
+                const sampleCount = Math.max(5, Math.floor(mainPath.length * 0.25));
                 for (let bI = 0; bI < sampleCount; bI++) {
-                    const idx = Math.floor((bI / sampleCount) * mainPath.length * (0.6 + Math.random() * 0.6));
-                    if (Math.random() > 0.25) {
-                        // add small jittered forks and allow deeper recursion occasionally
-                        this.createBranch(mainPath[Math.max(1, Math.min(mainPath.length-2, idx))], 0, 2 + (Math.random() < 0.18 ? 1 : 0));
+                    const idx = Math.floor((bI / sampleCount) * mainPath.length * (0.5 + Math.random() * 0.8));
+                    if (Math.random() > 0.15) {
+                        this.createBranch(mainPath[Math.max(1, Math.min(mainPath.length-2, idx))], 0, 3 + (Math.random() < 0.25 ? 1 : 0));
                     }
                 }
 
-                // Multi-segment return stroke: quick brightening pulses along core with small delays
-                const pulseCount = 1 + Math.floor(Math.random() * 2);
-                for (let p = 0; p < pulseCount; p++) {
-                    setTimeout(() => {
-                        if (mainBolt && mainBolt.material) {
-                            mainBolt.material.opacity = 1.2;
-                        }
-                        if (glow && glow.material) glow.material.opacity = Math.min(1.0, glow.material.opacity + 0.35);
-                        // emit some transient sparks (tiny particles) near the bottom of the bolt
-                        // reduced and softened spark approach: lightweight translucent points (not bright white beads)
-                        const sparkGeo = new THREE.BufferGeometry();
-                        const sc = 12 + Math.floor(Math.random() * 18);
-                        const sPos = new Float32Array(sc * 3);
-                        for (let si = 0; si < sc; si++) {
-                            const t = Math.random();
-                            const pt = mainPath[Math.floor(t * (mainPath.length-1))];
-                            sPos[si*3] = pt.x + (Math.random()-0.5) * 1.6;
-                            sPos[si*3+1] = pt.y + (Math.random()-0.5) * 1.2;
-                            sPos[si*3+2] = pt.z + (Math.random()-0.5) * 1.6;
-                        }
-                        sparkGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-                        // softer spark color and lower opacity to avoid white dots
-                        const sparkMat = new THREE.PointsMaterial({ size: 0.6, color: 0x9fdcff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending });
-                        const sparks = new THREE.Points(sparkGeo, sparkMat);
-                        sparks.userData = { life: 0.18 + Math.random() * 0.22 };
-                        AppState.scene.add(sparks);
-                        this.bolts.push(sparks);
-                        setTimeout(() => {
-                            // quick fade
-                            if (mainBolt && mainBolt.material) mainBolt.material.opacity = Math.max(0.0, (mainBolt.material.opacity || 1) - 0.6);
-                            if (glow && glow.material) glow.material.opacity *= 0.6;
-                        }, 60 + Math.random() * 120);
-                    }, 30 * p + Math.random() * 90);
+                // Scene-wide bright flash for impact
+                if (!this.ambientFlash) {
+                    this.ambientFlash = { intensity: 0.6, duration: 0, maxDuration: 80 };
+                    const ambLight = new THREE.PointLight(0xeef5ff, 0.3, 500);
+                    ambLight.position.set((sx + ex) / 2, (sy + ey) / 2, (sz + ez) / 2);
+                    AppState.scene.add(ambLight);
+                    this.ambientFlash.light = ambLight;
+                } else {
+                    this.ambientFlash.intensity = Math.min(1.0, this.ambientFlash.intensity + 0.4);
+                    this.ambientFlash.duration = 0;
                 }
             }
 
@@ -4536,7 +4766,9 @@
 
         // Volcano & Industrial emitters produce smoke/pyro cloud seeds (pyrocumulus)
         class SourceEmitter {
-            constructor(type='factory', x=60, z=-40) {
+            // size ~= lateral scale of emitter (used to scale geometry and emission strength)
+            // height is used as an approximate source altitude baseline
+            constructor(type='factory', x=60, z=-40, size=8, height=10) {
                 this.type = type;
                 this.x = x; this.z = z;
                 this.group = new THREE.Group();
@@ -4544,11 +4776,52 @@
                 this.timer = 0;
                 this.puffs = [];
                 // visual marker (small building/volcano)
+                // accept size/height parameters to scale volcanic edifice and pyro emissions
+                this.size = size || 8;
+                this.height = height || 10;
                 if (type === 'volcano') {
-                    const geo = new THREE.ConeGeometry(6, 8, 12);
-                    const mat = new THREE.MeshStandardMaterial({ color: 0x442a1a, roughness: 0.9 });
-                    const m = new THREE.Mesh(geo, mat); m.position.set(x, 0, z);
-                    this.group.add(m);
+                    // scale geometric source dimensions by provided size/height
+                    const baseRadius = Math.max(6, this.size * 1.0);
+                    const coneRadius = Math.max(4.5, this.size * 0.75);
+                    const coneHeight = Math.max(6, this.height * 0.9);
+                    const rimRadius = Math.max(3.5, this.size * 0.5);
+
+                    const baseMat = new THREE.MeshStandardMaterial({ color: 0x3b2b24, roughness: 0.95 });
+                    const flankMat = new THREE.MeshStandardMaterial({ color: 0x2f241f, roughness: 0.92 });
+                    const rimMat = new THREE.MeshStandardMaterial({ color: 0x2a1d16, roughness: 0.96 });
+
+                    const baseGeo = new THREE.CylinderGeometry(baseRadius * 1.1, baseRadius * 1.3, Math.max(3, this.size * 0.35), 28);
+                    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+                    baseMesh.position.set(x, Math.max(1.6, this.size * 0.25), z);
+                    baseMesh.castShadow = true;
+                    baseMesh.receiveShadow = true;
+                    this.group.add(baseMesh);
+
+                    const flankGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 28);
+                    const flank = new THREE.Mesh(flankGeo, flankMat);
+                    flank.position.set(x, Math.max(2.6, coneHeight * 0.5), z);
+                    flank.castShadow = true;
+                    this.group.add(flank);
+
+                    const rimGeo = new THREE.TorusGeometry(rimRadius, Math.max(0.5, rimRadius * 0.08), 12, 40);
+                    const rim = new THREE.Mesh(rimGeo, rimMat);
+                    rim.rotation.x = Math.PI / 2;
+                    rim.position.set(x, Math.max(2.6, coneHeight * 0.92), z);
+                    rim.castShadow = false;
+                    this.group.add(rim);
+
+                    const lavaGeo = new THREE.PlaneGeometry(Math.max(4, rimRadius * 1.2), Math.max(10, coneHeight * 0.9), 6, 1);
+                    const lavaMat = new THREE.MeshStandardMaterial({ color: 0xff5b22, emissive: 0xff6e33, emissiveIntensity: 1.6, roughness: 0.5, metalness: 0.12 });
+                    const lava = new THREE.Mesh(lavaGeo, lavaMat);
+                    lava.rotation.x = -Math.PI / 2;
+                    lava.position.set(x, Math.max(2.2, coneHeight * 0.9 - 0.6), z - Math.min(2.4, rimRadius * 0.3));
+                    lava.receiveShadow = false;
+                    this.group.add(lava);
+
+                    const lavaLight = new THREE.PointLight(0xff7a33, 1.1 + (this.size * 0.02), Math.max(18, rimRadius * 2.4));
+                    lavaLight.position.set(x, Math.max(2.6, coneHeight * 0.92), z);
+                    AppState.scene.add(lavaLight);
+                    this._lavaLight = lavaLight;
                 } else {
                     const box = new THREE.BoxGeometry(6,4,6);
                     const mat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a });
@@ -4558,56 +4831,72 @@
             }
             update(t) {
                 this.timer++;
-                // occasionally emit a strong thermal plume for volcanos / factory cooling stacks
-                if (this.timer % (this.type==='volcano'? 28 : 80) === 0) {
-                    const strength = this.type==='volcano' ? (1.6 + Math.random()*1.8) : (0.5 + Math.random()*0.9);
-                    const r = new THREE.Group();
-                    const puff = AppState.cloudSystem.makePuff(this.x, 6 + (this.type==='volcano'? Math.random()*6 : 2.5), this.z, 6 + Math.random()*5, 0.1 + Math.random()*0.18, 0.6, 'cumulus');
-                    puff.userData = puff.userData || {};
-                    puff.userData.updraftClone = true;
-                    puff.userData.vy = 0.03 + strength*0.02;
-                    puff.userData.spreadSpeed = 0.02 + Math.random()*0.02;
-                    puff.userData.maxRise = 10 + (this.type==='volcano'? 18 : 8) + Math.random()*6;
-                    r.add(puff);
-                    this.group.add(r);
-                    AppState.cloudSystem.updrafts.push({ x: this.x, z: this.z, strength: strength, radius: 30 + Math.random()*40, age:0, maxAge: 220 });
-                    // provide a chance to spawn pyro cloud formation: convert to pyrocumulus variant
-                    if (Math.random() < (this.type==='volcano'? 0.45 : 0.12)) {
-                        const c = AppState.cloudSystem.grow(this.x + (Math.random()-0.5)*6, this.z + (Math.random()-0.5)*6);
-                        if (c) {
-                            c.baseHeight = 8;
-                            c.mass += 2.2;
-                            c.condensationLevel = Math.min(1, c.condensationLevel + 0.4);
-                            c.stage = 'pyrocumulus';
-                            // darken puffs to convey smoke
-                            c.puffs.forEach(p => { if (p.material) { p.material.color.setRGB(0.45,0.45,0.5); p.material.opacity *= 0.88; } });
-                        }
+                // volcano: frequent pulsing pyro-emissions (stronger and more likely to form pyrocumulus variants)
+                if (this.type === 'volcano' && this.timer % Math.max(8, Math.floor(28 - this.size * 0.6)) === 0) {
+                    // scale strength and radii by emitter size so large volcanoes produce stronger pyro-convection
+                    const sizeScale = Math.max(1.0, this.size / 8);
+                    const strength = 1.6 * sizeScale + Math.random() * (2.2 * sizeScale);
+                    const jitter = Math.max(1.2, Math.min(6, this.size * 0.12));
+                    const baseX = this.x + (Math.random() - 0.5) * jitter;
+                    const baseZ = this.z + (Math.random() - 0.5) * jitter;
+                    
+                    // NEW: Spawn actual pyro clouds via CloudGrowth system instead of raw puffs
+                    const pyroCloud = AppState.cloudSystem.grow(baseX, baseZ);
+                    if (pyroCloud) {
+                        // force pyro characteristics: darker, turbulent, aggressive
+                        const sourceAlt = Math.max(4, (this.height || 10) * 0.6 + Math.random() * (this.height || 10) * 0.6);
+                        pyroCloud.baseHeight = Math.max(3, sourceAlt - 1.2);
+                        pyroCloud.height = sourceAlt + 2 + Math.random() * 4;
+                        pyroCloud.cloudBase = Math.max(2, sourceAlt - 2);
+                        pyroCloud.cloudTop = sourceAlt + 8 + Math.random() * 12;
+                        pyroCloud.mass = Math.max(2.8, 1.2 + strength * 0.9);
+                        pyroCloud.condensationLevel = Math.min(1, 0.55 + strength * 0.15);
+                        pyroCloud.turbulence = Math.max(0.65, 0.3 + strength * 0.25);
+                        pyroCloud.growthRate *= (1.4 + sizeScale * 0.6);
+                        pyroCloud.verticalVelocity = 0.12 + strength * 0.08;
+                        pyroCloud.buoyancy = 1.2 + strength * 0.8;
+                        // darken for pyro signature (ash/smoke tint)
+                        pyroCloud.puffs.forEach(p => {
+                            if (p && p.material) {
+                                p.material.color.lerp(new THREE.Color(0.22, 0.18, 0.15), 0.65);
+                                if (p.material.emissive) p.material.emissive.lerp(new THREE.Color(0x440000), 0.45);
+                            }
+                        });
+                        // mark as pyro cloud for special handling (enhanced convection)
+                        pyroCloud._isPyroCloud = true;
                     }
-                    // brief ember particles for volcano
-                    if (this.type === 'volcano' && Math.random() < 0.6) {
-                        const egeo = new THREE.BufferGeometry();
-                        const cnt = 18;
-                        const arr = new Float32Array(cnt*3);
-                        for (let i=0;i<cnt;i++) {
-                            arr[i*3] = this.x + (Math.random()-0.5)*4;
-                            arr[i*3+1] = 2 + Math.random()*6;
-                            arr[i*3+2] = this.z + (Math.random()-0.5)*4;
-                        }
-                        egeo.setAttribute('position', new THREE.BufferAttribute(arr,3));
-                        const emat = new THREE.PointsMaterial({ size:0.28, color:0xff8a33, transparent:true, opacity:0.9 });
-                        const emb = new THREE.Points(egeo, emat);
-                        emb.userData = { life: 0.8 + Math.random()*0.6 };
-                        AppState.scene.add(emb);
-                        (this._embers = this._embers||[]).push(emb);
-                    }
+                    
+                    // also spawn a strong updraft pulse centered on volcano
+                    AppState.cloudSystem.updrafts.push({
+                        x: baseX,
+                        z: baseZ,
+                        strength: 1.8 * sizeScale + strength * 0.7,
+                        radius: Math.max(18, Math.floor(26 * sizeScale + Math.random() * (this.size * 1.4))),
+                        height: 0,
+                        maxHeight: Math.max(20, this.height * 1.6),
+                        age: 0,
+                        maxAge: 220 + Math.floor(Math.random() * 480 * sizeScale),
+                        active: true
+                    });
                 }
+
+                // industrial/factory emission cadence (less intense)
+                if (this.type !== 'volcano' && this.timer % (this.type === 'factory' ? 78 : 120) === 0) {
+                    const strength = 0.5 + Math.random()*0.9;
+                    const w = AppState.cloudSystem.makePuff(this.x + (Math.random()-0.5)*2, 4 + Math.random()*2, this.z + (Math.random()-0.5)*2, 2 + Math.random()*3, 0.06 + Math.random()*0.08, 0.18, 'cumulus');
+                    w.userData = w.userData || {};
+                    w.userData.updraftClone = true;
+                    w.userData.vy = 0.02 + Math.random()*0.02;
+                    AppState.cloudSystem.updrafts.push({ x: this.x, z: this.z, strength: 0.38 + strength*0.4, radius: 12 + Math.random()*10, age:0, maxAge: 120 + Math.floor(Math.random()*120) });
+                }
+
                 // update ember lifetimes
                 if (this._embers) {
                     for (let i=this._embers.length-1;i>=0;i--) {
                         const eb = this._embers[i];
                         eb.userData.life -= 0.01;
                         eb.material.opacity *= 0.97;
-                        eb.position.y += 0.02;
+                        eb.position.y += (eb.userData.vy || 0) * 0.6;
                         if (eb.userData.life <= 0) {
                             AppState.scene.remove(eb);
                             if (eb.geometry) eb.geometry.dispose();
@@ -4615,6 +4904,12 @@
                             this._embers.splice(i,1);
                         }
                     }
+                }
+
+                // gentle pulsing of lava/emissive vent if present
+                if (this._lavaLight) {
+                    this._lavaLight.intensity = 0.6 + 0.6 * (0.6 + 0.4 * Math.sin(this.timer * 0.06)) * (1 + (this.size / 14));
+                    this._lavaLight.position.y = Math.max(2.4, (this.height || 10) * 0.92) + Math.sin(this.timer * 0.02) * 0.08;
                 }
             }
             dispose() {
@@ -6262,16 +6557,46 @@
 
             // Compute terrain-forced vertical motion at position
             computeOrographicLift(x, z, windField) {
-                // sample terrain height at neighbors
-                const dx = 12;
-                const z0 = Math.sin(x * 0.02) * Math.cos(z * 0.03) * 2;
-                const zx_pos = Math.sin((x + dx) * 0.02) * Math.cos(z * 0.03) * 2;
-                const zx_neg = Math.sin((x - dx) * 0.02) * Math.cos(z * 0.03) * 2;
-                // slope in x direction
-                const slopex = (zx_pos - zx_neg) / (dx * 2);
-                // wind advects over slope: lift proportional to slope * wind
-                const wind = windField.getAt(x, 2, z);
-                const lift = (slopex * wind.x) * 0.04;
+                // stronger orographic lift in proximity to mountain ranges: sample nearest mountain and slope
+                let lift = 0;
+                try {
+                    if (AppState.mountainRanges && AppState.mountainRanges.length) {
+                        for (const m of AppState.mountainRanges) {
+                            const dx = x - m.x;
+                            const dz = z - m.z;
+                            const dist = Math.hypot(dx, dz);
+                            if (dist < m.r * 1.6) {
+                                // slope approx from mountain geometry and roughness
+                                const slope = Math.max(0, (m.height / Math.max(3, m.r)) * (1 + (m.roughness || 0.9) * 0.6));
+                                // wind projection into mountain normal
+                                const w = windField.getAt(x, 2, z);
+                                const windMag = Math.hypot(w.x || 0, w.z || 0);
+                                // lift scales strongly near crest and with incoming wind magnitude
+                                const proximity = 1 - Math.min(1, dist / (m.r * 1.6));
+                                lift += slope * windMag * proximity * 0.12 * (1 + (m.steepness || 1) * 0.25);
+                            }
+                        }
+                    }
+                    // fallback small-scale empirical lift if no mountains nearby
+                    if (lift === 0) {
+                        const dx = 12;
+                        const z0 = Math.sin(x * 0.02) * Math.cos(z * 0.03) * 2;
+                        const zx_pos = Math.sin((x + dx) * 0.02) * Math.cos(z * 0.03) * 2;
+                        const zx_neg = Math.sin((x - dx) * 0.02) * Math.cos(z * 0.03) * 2;
+                        const slopex = (zx_pos - zx_neg) / (dx * 2);
+                        const wind = windField.getAt(x, 2, z);
+                        lift = (slopex * wind.x) * 0.04;
+                    }
+                } catch (e) {
+                    // safe fallback
+                    const dx = 12;
+                    const z0 = Math.sin(x * 0.02) * Math.cos(z * 0.03) * 2;
+                    const zx_pos = Math.sin((x + dx) * 0.02) * Math.cos(z * 0.03) * 2;
+                    const zx_neg = Math.sin((x - dx) * 0.02) * Math.cos(z * 0.03) * 2;
+                    const slopex = (zx_pos - zx_neg) / (dx * 2);
+                    const wind = windField.getAt(x, 2, z);
+                    lift = (slopex * wind.x) * 0.04;
+                }
                 return lift;
             }
 
@@ -6564,6 +6889,8 @@
             back.position.set(-50, 40, -60);
             AppState.scene.add(back);
 
+            // ensure emitter array exists before terrain creation (createTerrain may push emitters)
+            AppState.emitters = AppState.emitters || [];
             createTerrain();
             
             // instantiate water plane (placed after terrain so it's below ground low points)
@@ -7142,7 +7469,8 @@
             // shadows
             AppState.renderer.shadowMap.enabled = Graphics.shadows;
             // wind multiplier applied immediately to wind sampling; ensure it's clamped to safe range
-            Graphics.windMultiplier = Math.max(0.1, Math.min(4.0, Number(Graphics.windMultiplier || 1.0)));
+            // allow user to set very large wind multipliers (no low hard cap), but enforce a tiny floor to avoid zero
+            Graphics.windMultiplier = Math.max(0.01, Number(Graphics.windMultiplier || 1.0));
             // also try to set castShadow on directional lights if present
             AppState.scene.traverse(obj => {
                 if (obj.isDirectionalLight || obj.isSpotLight || obj.isPointLight) {
@@ -7318,7 +7646,8 @@
         // spawn an industrial park and a volcano
         AppState.emitters.push(new SourceEmitter('factory', -90, 60));
         AppState.emitters.push(new SourceEmitter('factory', 140, -10));
-        AppState.emitters.push(new SourceEmitter('volcano', 40, -160));
+        // create a large standalone volcano scaled to look mountain-sized
+        AppState.emitters.push(new SourceEmitter('volcano', 40, -160, 48, 24));
 
         // NEW: RainFog instance
         AppState.rainFog = new RainFog();
@@ -7837,4 +8166,4 @@
         })();
     </script>
 </body>
-</html>
+</html>​
